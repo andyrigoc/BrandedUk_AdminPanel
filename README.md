@@ -1,4 +1,4 @@
-# Chargerzilla Admin Panel
+# BrandedUk Admin Panel
 
 Professional SaaS-style admin panel for managing EV charging stations.
 
@@ -23,7 +23,7 @@ Professional SaaS-style admin panel for managing EV charging stations.
 ## Installation
 
 ```bash
-cd chargerzilla-admin
+cd brandeduk-admin
 npm install
 ```
 
