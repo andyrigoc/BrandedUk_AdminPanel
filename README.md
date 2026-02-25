@@ -1,4 +1,4 @@
-# BrandedUk Admin Panel
+# BrandedUK_Admin Panel
 
 Professional SaaS-style admin panel for managing EV charging stations.
 
