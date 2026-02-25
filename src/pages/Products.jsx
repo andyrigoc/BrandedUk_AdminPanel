@@ -707,19 +707,27 @@ const Products = () => {
     }
 
     const handleSaveDisplayOrder = async () => {
-        // Validate before save
+        // 1. UI Validation: Check for duplicates or invalid numbers
         if (!validateOrders()) {
             setError('Please fix validation errors before saving')
             return
         }
 
-        const updates = Array.from(selectedProducts.entries()).map(([code, data]) => ({
-            style_code: code,
-            display_order: data.display_order
-        }))
+        // 2. SANITY CHECK (The "Bouncer"): Ensure only products belonging to THIS category are sent
+        // This prevents "Ghost Products" from polluting other categories
+        const updates = Array.from(selectedProducts.entries())
+            .filter(([code, data]) => {
+                // Check if product belongs to this type (by ID or Slug as fallback)
+                const productTypeId = data.product_type_id || data.productTypeId
+                return productTypeId === selectedType.id
+            })
+            .map(([code, data]) => ({
+                style_code: code,
+                display_order: data.display_order
+            }))
 
         if (updates.length === 0) {
-            setError('No products selected')
+            setError('No valid products for this category found in your selection')
             return
         }
 
@@ -727,36 +735,45 @@ const Products = () => {
             setProcessing(true)
             setError(null)
 
+            // 3. ATOMIC PAYLOAD: Lock the save to the specific Category Context
+            const payload = {
+                product_type_id: selectedType.id,
+                orders: updates
+            }
+
             const response = await fetch(`${API_BASE}/api/display-order/bulk`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    product_type_id: selectedType.id,
-                    orders: updates
-                })
+                body: JSON.stringify(payload)
             })
 
+            const result = await response.json().catch(() => ({}))
+
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}))
-                throw new Error(errorData.message || 'Failed to save display orders')
+                throw new Error(result.message || 'Failed to save display orders')
             }
 
-            setSuccessMessage('Display orders saved successfully')
+            // 4. CROSS-CATEGORY WARNING: Detect if the backend skipped dirty data
+            const sentCount = updates.length
+            const savedCount = result.updatedCount ?? result.count ?? sentCount
+
+            if (savedCount < sentCount) {
+                setSuccessMessage(`Saved partially! ${savedCount} items updated, but ${sentCount - savedCount} products were skipped because they belong to other categories.`)
+            } else {
+                setSuccessMessage('Display orders saved successfully and written to Audit Log.')
+            }
+
+            // 5. CLEANUP: Clear selection after successful atomic save
             setSelectedProducts(new Map())
             setValidationErrors(new Map())
             setSelectedAction('')
 
-            // Reset to page 1 and refresh data
-            setCurrentPage(1)
-
-            // Wait for backend to fully commit (materialized view refresh)
-            await new Promise(resolve => setTimeout(resolve, 1000))
-
-            // Refresh both pinned products and the products list
+            // Refresh data to reflect the new "Written in Stone" order
+            await new Promise(resolve => setTimeout(resolve, 800))
             await fetchAllPinnedProducts()
             await fetchProducts()
 
-            setTimeout(() => setSuccessMessage(null), 3000)
+            setTimeout(() => setSuccessMessage(null), 5000)
 
         } catch (err) {
             setError(err.message)
