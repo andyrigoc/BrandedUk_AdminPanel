@@ -714,12 +714,18 @@ const Products = () => {
         }
 
         // 2. SANITY CHECK (The "Bouncer"): Ensure only products belonging to THIS category are sent
-        // This prevents "Ghost Products" from polluting other categories
         const updates = Array.from(selectedProducts.entries())
             .filter(([code, data]) => {
-                // Check if product belongs to this type (by ID or Slug as fallback)
-                const productTypeId = data.product_type_id || data.productTypeId
-                return productTypeId === selectedType.id
+                // Get the ID from any possible field name
+                const pId = data.product_type_id || data.productTypeId || data.type_id || data.typeId;
+                const sId = selectedType.id;
+
+                // If the product doesn't have a type ID at all, we'll allow it 
+                // because it was selected while this category was active.
+                if (!pId) return true;
+
+                // Compare as strings to avoid Type Mismatch (e.g., 21 vs "21")
+                return String(pId) === String(sId);
             })
             .map(([code, data]) => ({
                 style_code: code,
