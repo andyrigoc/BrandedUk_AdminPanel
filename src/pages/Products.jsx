@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Card from '../components/Card'
 import {
@@ -56,6 +56,8 @@ const Products = () => {
     const [customMarkups, setCustomMarkups] = useState(new Map()) // code -> percentage
 
     const dropdownRef = useRef(null)
+    const abortControllerRef = useRef(null)
+    const fetchIdRef = useRef(0)
 
     const bulkActions = viewType === 'deactivated' ? [
         { label: 'Activate Products', value: 'bulk-activate', icon: Power },
@@ -253,24 +255,33 @@ const Products = () => {
         fetchAllPinnedProducts()
     }, [fetchAllPinnedProducts])
 
-    // Fetch products
+    // Fetch products — with AbortController to prevent race conditions
     const fetchProducts = useCallback(async () => {
         if (!selectedType) return
+
+        // Cancel any in-flight request before starting a new one
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+        }
+        const controller = new AbortController()
+        abortControllerRef.current = controller
+
+        // Track this specific fetch so stale responses are ignored
+        const thisFetchId = ++fetchIdRef.current
 
         try {
             setLoadingProducts(true)
             // Clear old products immediately to prevent showing stale data
             setProducts([])
 
-            const isSearching = !!debouncedSearchTerm
-
             const params = new URLSearchParams()
 
-            if (isSearching) {
+            // ALWAYS include productType to scope results to the selected category
+            params.append('productType', selectedType.slug)
+
+            if (debouncedSearchTerm) {
                 params.append('q', debouncedSearchTerm)
                 params.append('sort', 'newest')
-            } else {
-                params.append('productType', selectedType.slug)
             }
 
             params.append('page', currentPage.toString())
@@ -280,10 +291,18 @@ const Products = () => {
             const endpoint = viewType === 'deactivated' ? '/api/products/discontinued' : '/api/products'
             const response = await fetch(`${API_BASE}${endpoint}?${params}`, {
                 cache: 'no-store',
-                headers: { 'Cache-Control': 'no-cache' }
+                headers: { 'Cache-Control': 'no-cache' },
+                signal: controller.signal
             })
+
+            // If a newer fetch was started while we were waiting, discard this result
+            if (thisFetchId !== fetchIdRef.current) return
+
             if (!response.ok) throw new Error('Failed to fetch products')
             const data = await response.json()
+
+            // Double-check we're still the latest fetch before applying state
+            if (thisFetchId !== fetchIdRef.current) return
 
             setProducts(data.items || [])
             // Handle flat response structure (from user provided JSON) vs potential nested pagination
@@ -295,18 +314,31 @@ const Products = () => {
             // to maintain a complete map across all pages
 
         } catch (err) {
+            // Ignore abort errors — they are expected when we cancel stale requests
+            if (err.name === 'AbortError') return
+            // Only apply error state if this is still the active fetch
+            if (thisFetchId !== fetchIdRef.current) return
             console.error('Error fetching products:', err)
             setError('Failed to load products')
         } finally {
-            setLoadingProducts(false)
+            // Only clear loading if this is still the active fetch
+            if (thisFetchId === fetchIdRef.current) {
+                setLoadingProducts(false)
+            }
         }
     }, [selectedType, debouncedSearchTerm, currentPage, itemsPerPage, viewType])
 
     useEffect(() => {
         fetchProducts()
+        // Cleanup: abort in-flight request when dependencies change or component unmounts
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+            }
+        }
     }, [fetchProducts])
 
-    // Handle type change
+    // Handle type change — cancel in-flight requests and reset all filters immediately
     const handleTypeChange = (type) => {
         if (selectedProducts.size > 0) {
             if (!confirm('You have unsaved selections. Switching will clear them. Continue?')) {
@@ -315,9 +347,24 @@ const Products = () => {
             setSelectedProducts(new Map())
             setPinnedPositions(new Map())
         }
+
+        // Cancel any in-flight request immediately to prevent stale data
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+        }
+
+        // Reset BOTH searchTerm AND debouncedSearchTerm synchronously
+        // to prevent the 500ms debounce window from causing an unfiltered fetch
+        setSearchTerm('')
+        setDebouncedSearchTerm('')
+
+        setSelectedStyle(null)
         setSelectedType(type)
         setCurrentPage(1)
-        setSearchTerm('')
+        setError(null)
+
+        // Fetch styles for the new type
+        fetchStyles(type.slug)
     }
 
     // Selection helpers
