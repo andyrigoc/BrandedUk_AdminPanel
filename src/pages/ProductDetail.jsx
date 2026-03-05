@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Card from '../components/Card'
 import { ArrowLeft, XCircle, CheckCircle, Save, X, Edit3, Package, Palette, DollarSign, FileText, Image as ImageIcon, Calculator, TrendingUp, AlertCircle, Plus, Star, Sparkles, Camera, Trash2, ListRestart, Layers, Info } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const ProductDetail = () => {
     const navigate = useNavigate()

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Card from '../components/Card'
 import { Search, ChevronLeft, ChevronRight, Edit2, Plus, X, RefreshCw } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const MarkupTiers = () => {
     const [searchTerm, setSearchTerm] = useState('')

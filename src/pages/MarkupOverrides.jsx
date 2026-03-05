@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Card from '../components/Card'
 import { Search, RefreshCw, AlertCircle, CheckCircle2, Edit3, X, Save, ExternalLink, Trash2, Percent, Layers } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const MarkupOverrides = () => {
     const navigate = useNavigate()

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Card from '../components/Card'
 import { Search, Edit3, Check, X, ToggleLeft, ToggleRight, Package, AlertCircle } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const ProductTypes = () => {
     const [productTypes, setProductTypes] = useState([])

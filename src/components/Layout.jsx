@@ -28,6 +28,7 @@ import {
   X
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { API_BASE } from '../config'
 
 const Layout = ({ children, onLogout }) => {
   const location = useLocation()
@@ -53,7 +54,7 @@ const Layout = ({ children, onLogout }) => {
 
       try {
         setIsSearching(true)
-        const response = await fetch(`https://api.brandeduk.com/api/products/suggest?q=${encodeURIComponent(searchQuery)}`)
+        const response = await fetch(`${API_BASE}/api/products/suggest?q=${encodeURIComponent(searchQuery)}`)
         if (!response.ok) throw new Error('Search failed')
         const data = await response.json()
         setSuggestions(data)
@@ -99,7 +100,7 @@ const Layout = ({ children, onLogout }) => {
         message: 'Starting the background update process...'
       })
 
-      const response = await fetch('https://api.brandeduk.com/api/admin/pricing/sync', {
+      const response = await fetch(`${API_BASE}/api/admin/pricing/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ wait: false }) // Background Mode

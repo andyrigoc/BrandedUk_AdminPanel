@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Card from '../components/Card'
 import { Tags, Edit3, Check, X, AlertCircle, TrendingDown, RefreshCw } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const DiscountTiers = () => {
     const [tiers, setTiers] = useState([])

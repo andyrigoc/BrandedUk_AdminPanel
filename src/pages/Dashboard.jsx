@@ -14,7 +14,7 @@ import {
     AlertCircle
 } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const Dashboard = () => {
     const navigate = useNavigate()
@@ -231,8 +231,8 @@ const Dashboard = () => {
                                             <div className="flex items-center gap-2">
                                                 {getStatusIcon(order.status)}
                                                 <span className={`text-sm font-medium ${order.status === 'Shipped' ? 'text-emerald-700' :
-                                                        order.status === 'Cancelled' ? 'text-rose-700' :
-                                                            'text-amber-700'
+                                                    order.status === 'Cancelled' ? 'text-rose-700' :
+                                                        'text-amber-700'
                                                     }`}>
                                                     {order.status}
                                                 </span>

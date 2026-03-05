@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Card from '../components/Card'
 import { Palette, Plus, Upload, X, Check, Settings, Image as ImageIcon, AlertCircle } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const CustomizationConfig = () => {
     const [productTypes, setProductTypes] = useState([])

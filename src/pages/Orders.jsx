@@ -24,7 +24,7 @@ import {
     Edit3
 } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const Orders = () => {
     const [orders, setOrders] = useState([])

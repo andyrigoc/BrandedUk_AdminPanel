@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Card from '../components/Card'
-import { Search, Edit3, Check, X, ToggleLeft, ToggleRight, Building2, Upload, AlertCircle, Image as ImageIcon } from 'lucide-react'
+import { Search, Edit3, Check, X, ToggleLeft, ToggleRight, Building2, Upload, AlertCircle, Image as ImageIcon, Loader2 } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const Brands = () => {
+    const [searchParams, setSearchParams] = useSearchParams()
+    const selectedSupplierSlug = searchParams.get('supplier') || ''
+
     const [brands, setBrands] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -12,28 +16,50 @@ const Brands = () => {
     const [editingId, setEditingId] = useState(null)
     const [editName, setEditName] = useState('')
     const [saving, setSaving] = useState(false)
-    const [activeSupplier, setActiveSupplier] = useState('Ralawise')
+    const [suppliers, setSuppliers] = useState([])
+    const [loadingSuppliers, setLoadingSuppliers] = useState(true)
 
-    const suppliers = [
-        { name: 'Ralawise', id: 'ralawise', status: 'active' },
-        { name: 'Uneek', id: 'uneek', status: 'coming_soon' },
-        { name: 'Absolute Apparel', id: 'absolute_apparel', status: 'coming_soon' }
-    ]
+    const setSupplier = (slug) => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev)
+            if (slug) next.set('supplier', slug)
+            else next.delete('supplier')
+            return next
+        })
+    }
+
+    const selectedSupplierName = selectedSupplierSlug
+        ? (suppliers.find(s => s.slug === selectedSupplierSlug)?.name || selectedSupplierSlug)
+        : ''
 
     useEffect(() => {
-        fetchBrands()
+        const load = async () => {
+            try {
+                setLoadingSuppliers(true)
+                const res = await fetch(`${API_BASE}/api/admin/suppliers?limit=100`)
+                if (!res.ok) return
+                const data = await res.json()
+                setSuppliers(data.items || [])
+            } catch (err) {
+                console.error('Error fetching suppliers:', err)
+            } finally {
+                setLoadingSuppliers(false)
+            }
+        }
+        load()
     }, [])
 
-    const fetchBrands = async () => {
+    const fetchBrands = useCallback(async () => {
         try {
             setLoading(true)
-            const response = await fetch(`${API_BASE}/api/admin/brands`)
+            const url = selectedSupplierSlug
+                ? `${API_BASE}/api/admin/brands?supplier=${encodeURIComponent(selectedSupplierSlug)}`
+                : `${API_BASE}/api/admin/brands`
+            const response = await fetch(url)
             if (!response.ok) throw new Error('Failed to fetch brands')
             const data = await response.json()
 
-            // Check for data.items as per your response, fall back to .brands
             const raw = data.items || data.brands || []
-
             const brandsList = raw.map(b => ({
                 id: b.id,
                 name: b.name,
@@ -41,16 +67,18 @@ const Brands = () => {
                 productCount: parseInt(b.product_count || 0),
                 active: b.is_active
             }))
-            // Sort by name A-Z by default 
             brandsList.sort((a, b) => a.name.localeCompare(b.name))
-
             setBrands(brandsList)
         } catch (err) {
             setError(err.message)
         } finally {
             setLoading(false)
         }
-    }
+    }, [selectedSupplierSlug])
+
+    useEffect(() => {
+        fetchBrands()
+    }, [fetchBrands])
 
     const handleToggleActive = async (brand) => {
         // Optimistic update
@@ -148,23 +176,36 @@ const Brands = () => {
                     <p className="text-gray-500 mt-2 font-medium text-lg">Manage brand profiles, logos, and visibility across suppliers.</p>
                 </div>
 
-                {/* Supplier Tabs */}
-                <div className="flex bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200 shadow-sm backdrop-blur-sm self-start md:self-auto">
+                {/* Supplier Tabs — functional: filters brands by selected supplier */}
+                <div className="flex flex-wrap items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200 shadow-sm backdrop-blur-sm self-start md:self-auto">
+                    <button
+                        onClick={() => setSupplier('')}
+                        disabled={loadingSuppliers}
+                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${!selectedSupplierSlug
+                            ? 'bg-white text-primary shadow-md scale-105'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                        } disabled:opacity-60`}
+                    >
+                        All suppliers
+                    </button>
                     {suppliers.map(s => (
                         <button
                             key={s.id}
-                            onClick={() => setActiveSupplier(s.name)}
-                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeSupplier === s.name
-                                ? 'bg-white text-primary shadow-md transform scale-105'
+                            onClick={() => setSupplier(s.slug)}
+                            disabled={loadingSuppliers}
+                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${selectedSupplierSlug === s.slug
+                                ? 'bg-white text-primary shadow-md scale-105'
                                 : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                                }`}
+                            } disabled:opacity-60`}
                         >
                             {s.name}
-                            {s.status === 'coming_soon' && (
-                                <span className="text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Soon</span>
-                            )}
                         </button>
                     ))}
+                    {loadingSuppliers && (
+                        <span className="px-3 py-2 flex items-center text-gray-400">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -207,40 +248,22 @@ const Brands = () => {
                 </Card>
             </div>
 
-            {/* Content Based on Active Supplier */}
-            {activeSupplier !== 'Ralawise' ? (
-                <Card className="p-20 text-center border-2 border-dashed border-gray-200 bg-gray-50/30 rounded-[2.5rem] animate-in fade-in zoom-in-95 duration-500">
-                    <div className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-8 transform rotate-6 hover:rotate-0 transition-transform duration-500">
-                        <Upload className="w-12 h-12 text-primary/20 animate-pulse" />
-                    </div>
-                    <h2 className="text-3xl font-black text-gray-900 mb-4">{activeSupplier} Integration</h2>
-                    <p className="text-gray-500 text-lg max-w-md mx-auto font-medium leading-relaxed">
-                        We are currently mapping the brand database for <span className="text-primary font-bold">{activeSupplier}</span>.
-                        This feature will be available shortly.
-                    </p>
-                    <div className="mt-10 flex justify-center gap-4">
-                        <div className="px-6 py-2 bg-amber-50 text-amber-600 rounded-full text-sm font-black uppercase tracking-widest shadow-sm">Coming Soon</div>
-                        <button onClick={() => setActiveSupplier('Ralawise')} className="px-6 py-2 bg-white text-gray-500 hover:text-primary rounded-full text-sm font-bold border border-gray-200 shadow-sm transition-all hover:shadow-md">Return to Ralawise</button>
-                    </div>
-                </Card>
-            ) : (
-                <>
-                    {/* Search */}
-                    <div className="mb-6">
-                        <div className="relative max-w-md">
-                            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder={`Search ${activeSupplier} brands...`}
-                                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all shadow-sm"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                    </div>
+            {/* Search */}
+            <div className="mb-6">
+                <div className="relative max-w-md">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder={selectedSupplierName ? `Search ${selectedSupplierName} brands...` : 'Search brands...'}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all shadow-sm"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
 
-                    {/* Brands Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Brands Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredBrands.map((brand) => (
                             <Card key={brand.id} className={`p-6 transition-all rounded-3xl hover:shadow-xl hover:shadow-primary/5 group ${!brand.active ? 'opacity-60 grayscale' : 'hover:-translate-y-1'}`}>
                                 <div className="flex items-start justify-between mb-6">
@@ -323,17 +346,19 @@ const Brands = () => {
                                     <span className="font-black text-slate-900 bg-slate-50 px-3 py-1 rounded-full text-xs border border-slate-100">{brand.productCount || 0}</span>
                                 </div>
                             </Card>
-                        ))}
-                    </div>
+                ))}
+            </div>
 
-                    {filteredBrands.length === 0 && (
-                        <Card className="p-20 text-center rounded-[2.5rem] bg-gray-50/30 border-2 border-dashed border-gray-100">
-                            <Building2 className="w-16 h-16 text-gray-200 mx-auto mb-6" />
-                            <div className="text-lg font-black text-gray-400 uppercase tracking-widest">No matching brands</div>
-                            <button onClick={() => setSearchTerm('')} className="mt-4 text-primary font-bold hover:underline">Clear Search</button>
-                        </Card>
+            {filteredBrands.length === 0 && (
+                <Card className="p-20 text-center rounded-[2.5rem] bg-gray-50/30 border-2 border-dashed border-gray-100">
+                    <Building2 className="w-16 h-16 text-gray-200 mx-auto mb-6" />
+                    <div className="text-lg font-black text-gray-400 uppercase tracking-widest">
+                        {brands.length === 0 ? (selectedSupplierSlug ? 'No brands for this supplier' : 'No brands') : 'No matching brands'}
+                    </div>
+                    {brands.length > 0 && (
+                        <button onClick={() => setSearchTerm('')} className="mt-4 text-primary font-bold hover:underline">Clear Search</button>
                     )}
-                </>
+                </Card>
             )}
         </div>
     )

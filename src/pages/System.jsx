@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../components/Card'
 import { RefreshCw, Database, Clock, CheckCircle, AlertCircle, Zap } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const System = () => {
     const [refreshing, setRefreshing] = useState(false)

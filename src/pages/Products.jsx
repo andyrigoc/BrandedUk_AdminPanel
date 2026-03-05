@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { API_BASE } from '../config'
 import Card from '../components/Card'
 import {
     Search, ChevronLeft, ChevronRight, ChevronDown, Eye, ChevronUp, Pin, AlertTriangle,
@@ -7,10 +8,25 @@ import {
     Percent, Package, Loader2, CheckCircle2, RefreshCw, Sparkles as SparklesIcon
 } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
-
 const Products = () => {
     const navigate = useNavigate()
+    const [searchParams, setSearchParams] = useSearchParams()
+
+    // Supplier: persisted in URL (?supplier=slug), slug used for API
+    const selectedSupplierSlug = searchParams.get('supplier') || ''
+    const setSupplier = (slug) => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev)
+            if (slug) next.set('supplier', slug)
+            else next.delete('supplier')
+            return next
+        })
+        setCurrentPage(1)
+    }
+
+    // Suppliers list for toggle (from GET /api/admin/suppliers)
+    const [suppliers, setSuppliers] = useState([])
+    const [loadingSuppliers, setLoadingSuppliers] = useState(true)
 
     // Product types state
     const [productTypes, setProductTypes] = useState([])
@@ -172,21 +188,46 @@ const Products = () => {
     const [productStyles, setProductStyles] = useState([])
     const [selectedStyle, setSelectedStyle] = useState(null)
 
-    // Fetch product types
+    // Fetch suppliers for toggle (GET /api/admin/suppliers)
+    useEffect(() => {
+        const load = async () => {
+            try {
+                setLoadingSuppliers(true)
+                const res = await fetch(`${API_BASE}/api/admin/suppliers?limit=100`)
+                if (!res.ok) return
+                const data = await res.json()
+                setSuppliers(data.items || [])
+            } catch (err) {
+                console.error('Error fetching suppliers:', err)
+            } finally {
+                setLoadingSuppliers(false)
+            }
+        }
+        load()
+    }, [])
+
+    // Fetch product types (scoped by supplier when selected)
+    // GET /api/filters/product-types — no supplier = all types; ?supplier=slug = types for that supplier only
     useEffect(() => {
         const fetchProductTypes = async () => {
             try {
                 setLoadingTypes(true)
-                const response = await fetch(`${API_BASE}/api/filters/product-types?_t=${Date.now()}`)
+                const params = new URLSearchParams({ _t: Date.now().toString() })
+                if (selectedSupplierSlug) params.set('supplier', selectedSupplierSlug)
+                const response = await fetch(`${API_BASE}/api/filters/product-types?${params}`)
                 if (!response.ok) throw new Error('Failed to fetch product types')
                 const data = await response.json()
                 const types = data.product_types || data.productTypes || data || []
                 setProductTypes(types)
 
-                if (types.length > 0 && !selectedType) {
-                    setSelectedType(types[0])
-                    fetchStyles(types[0].slug)
-                }
+                setSelectedType((prev) => {
+                    if (types.length === 0) return null
+                    const stillInList = prev && types.some((t) => (t.id !== undefined && t.id === prev.id) || t.slug === prev.slug)
+                    if (stillInList) return prev
+                    const first = types[0]
+                    fetchStyles(first.slug)
+                    return first
+                })
             } catch (err) {
                 console.error('Error fetching product types:', err)
             } finally {
@@ -194,11 +235,13 @@ const Products = () => {
             }
         }
         fetchProductTypes()
-    }, [])
+    }, [selectedSupplierSlug])
 
     const fetchStyles = async (typeSlug) => {
         try {
-            const response = await fetch(`${API_BASE}/api/products/filters?productType=${typeSlug}`)
+            const params = new URLSearchParams({ productType: typeSlug })
+            if (selectedSupplierSlug) params.set('supplier', selectedSupplierSlug)
+            const response = await fetch(`${API_BASE}/api/products/filters?${params}`)
             if (!response.ok) return
             const data = await response.json()
             setProductStyles(data.filters?.style || [])
@@ -255,6 +298,11 @@ const Products = () => {
         fetchAllPinnedProducts()
     }, [fetchAllPinnedProducts])
 
+    // Refetch styles when supplier or type changes (facets scoped by supplier)
+    useEffect(() => {
+        if (selectedType?.slug) fetchStyles(selectedType.slug)
+    }, [selectedSupplierSlug, selectedType?.slug])
+
     // Fetch products — with AbortController to prevent race conditions
     const fetchProducts = useCallback(async () => {
         if (!selectedType) return
@@ -278,6 +326,10 @@ const Products = () => {
 
             // ALWAYS include productType to scope results to the selected category
             params.append('productType', selectedType.slug)
+
+            if (selectedSupplierSlug) {
+                params.set('supplier', selectedSupplierSlug)
+            }
 
             if (debouncedSearchTerm) {
                 params.append('q', debouncedSearchTerm)
@@ -326,7 +378,7 @@ const Products = () => {
                 setLoadingProducts(false)
             }
         }
-    }, [selectedType, debouncedSearchTerm, currentPage, itemsPerPage, viewType])
+    }, [selectedType, selectedSupplierSlug, debouncedSearchTerm, currentPage, itemsPerPage, viewType])
 
     useEffect(() => {
         fetchProducts()
@@ -1120,27 +1172,58 @@ const Products = () => {
 
                 {/* Main Content Area */}
                 <div className="flex-1 min-w-0">
-                    {/* Search Tabs */}
-                    {/* Catalog Status Toggler */}
-                    <div className="flex items-center gap-1 mb-6 p-1 bg-slate-100/50 rounded-lg w-fit border border-slate-200 shadow-inner">
-                        <button
-                            onClick={() => setViewType('standard')}
-                            className={`px-6 py-2 text-[13px] font-bold rounded-md transition-all duration-200 ${viewType === 'standard'
-                                ? 'bg-white text-primary shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600'
+                    {/* One row: supplier toggles (left), Live/Deactivated (right) — no "Supplier" label */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <div className="flex items-center gap-1 p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-sm">
+                            <button
+                                onClick={() => setSupplier('')}
+                                disabled={loadingSuppliers}
+                                className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all ${!selectedSupplierSlug
+                                    ? 'bg-white text-primary shadow-md'
+                                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                                } disabled:opacity-60`}
+                            >
+                                All suppliers
+                            </button>
+                            {suppliers.map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setSupplier(s.slug)}
+                                    disabled={loadingSuppliers}
+                                    className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all ${selectedSupplierSlug === s.slug
+                                        ? 'bg-white text-primary shadow-md'
+                                        : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                                    } disabled:opacity-60`}
+                                >
+                                    {s.name}
+                                </button>
+                            ))}
+                            {loadingSuppliers && (
+                                <span className="px-3 py-2 flex items-center text-gray-400">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1 p-1.5 bg-slate-100/50 rounded-xl border border-slate-200 shadow-inner">
+                            <button
+                                onClick={() => setViewType('standard')}
+                                className={`px-5 py-2 text-[13px] font-bold rounded-lg transition-all ${viewType === 'standard'
+                                    ? 'bg-white text-primary shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-600'
                                 }`}
-                        >
-                            Live Catalog
-                        </button>
-                        <button
-                            onClick={() => setViewType('deactivated')}
-                            className={`px-6 py-2 text-[13px] font-bold rounded-md transition-all duration-200 ${viewType === 'deactivated'
-                                ? 'bg-white text-primary shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600'
+                            >
+                                Live Catalog
+                            </button>
+                            <button
+                                onClick={() => setViewType('deactivated')}
+                                className={`px-5 py-2 text-[13px] font-bold rounded-lg transition-all ${viewType === 'deactivated'
+                                    ? 'bg-white text-primary shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-600'
                                 }`}
-                        >
-                            Deactivated
-                        </button>
+                            >
+                                Deactivated
+                            </button>
+                        </div>
                     </div>
 
                     {/* Search Bar & Filters */}

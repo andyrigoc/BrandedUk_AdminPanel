@@ -5,7 +5,7 @@ import {
     Layers, Package, ExternalLink, Pin, ChevronUp, ChevronDown, AlertTriangle
 } from 'lucide-react'
 
-const API_BASE = 'https://api.brandeduk.com'
+import { API_BASE } from '../config'
 
 const FeaturedProducts = () => {
     const [products, setProducts] = useState([])
