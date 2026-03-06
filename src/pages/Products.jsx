@@ -324,16 +324,17 @@ const Products = () => {
 
             const params = new URLSearchParams()
 
-            // ALWAYS include productType to scope results to the selected category
-            params.append('productType', selectedType.slug)
-
-            if (selectedSupplierSlug) {
-                params.set('supplier', selectedSupplierSlug)
-            }
-
+            // When searching, omit productType so the search spans all types within the supplier
             if (debouncedSearchTerm) {
                 params.append('q', debouncedSearchTerm)
                 params.append('sort', 'newest')
+            } else {
+                // Only scope by productType when NOT searching
+                params.append('productType', selectedType.slug)
+            }
+
+            if (selectedSupplierSlug) {
+                params.set('supplier', selectedSupplierSlug)
             }
 
             params.append('page', currentPage.toString())
@@ -1181,7 +1182,7 @@ const Products = () => {
                                 className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all ${!selectedSupplierSlug
                                     ? 'bg-white text-primary shadow-md'
                                     : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                                } disabled:opacity-60`}
+                                    } disabled:opacity-60`}
                             >
                                 All suppliers
                             </button>
@@ -1193,7 +1194,7 @@ const Products = () => {
                                     className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all ${selectedSupplierSlug === s.slug
                                         ? 'bg-white text-primary shadow-md'
                                         : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                                    } disabled:opacity-60`}
+                                        } disabled:opacity-60`}
                                 >
                                     {s.name}
                                 </button>
@@ -1210,7 +1211,7 @@ const Products = () => {
                                 className={`px-5 py-2 text-[13px] font-bold rounded-lg transition-all ${viewType === 'standard'
                                     ? 'bg-white text-primary shadow-sm'
                                     : 'text-slate-400 hover:text-slate-600'
-                                }`}
+                                    }`}
                             >
                                 Live Catalog
                             </button>
@@ -1219,7 +1220,7 @@ const Products = () => {
                                 className={`px-5 py-2 text-[13px] font-bold rounded-lg transition-all ${viewType === 'deactivated'
                                     ? 'bg-white text-primary shadow-sm'
                                     : 'text-slate-400 hover:text-slate-600'
-                                }`}
+                                    }`}
                             >
                                 Deactivated
                             </button>
