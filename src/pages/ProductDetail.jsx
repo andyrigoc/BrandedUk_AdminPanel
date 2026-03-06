@@ -1346,9 +1346,16 @@ const ProductDetail = () => {
                                 >
                                     <div className="aspect-square rounded-2xl overflow-hidden bg-gray-50 ring-2 ring-gray-100 group-hover:ring-primary transition-all">
                                         <img
-                                            src={color.thumb}
+                                            src={(() => {
+                                                const originalSrc = color.thumb;
+                                                if (originalSrc && originalSrc.includes('absoluteapparel.co.uk')) {
+                                                    return `https://images.weserv.nl/?url=${encodeURIComponent(originalSrc.replace('http://', 'https://'))}`;
+                                                }
+                                                return originalSrc;
+                                            })()}
                                             alt={color.name}
                                             className="w-full h-full object-cover"
+                                            referrerPolicy="no-referrer"
                                             onError={(e) => {
                                                 e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="%23e5e7eb"><rect width="100" height="100"/></svg>'
                                             }}
