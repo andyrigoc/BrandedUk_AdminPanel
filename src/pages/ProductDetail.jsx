@@ -676,9 +676,16 @@ const ProductDetail = () => {
                             <Card className="p-6 h-full">
                                 <div className="aspect-[4/3] bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl overflow-hidden mb-6 relative group">
                                     <img
-                                        src={newMainImagePreview || selectedImage || product.images?.[0]?.url}
+                                        src={(() => {
+                                            const originalSrc = newMainImagePreview || selectedImage || product.images?.[0]?.url;
+                                            if (originalSrc && typeof originalSrc === 'string' && originalSrc.includes('absoluteapparel.co.uk')) {
+                                                return `https://images.weserv.nl/?url=${encodeURIComponent(originalSrc.replace('http://', 'https://'))}`;
+                                            }
+                                            return originalSrc;
+                                        })()}
                                         alt={product.name}
                                         className="w-full h-full object-contain"
+                                        referrerPolicy="no-referrer"
                                         onError={(e) => {
                                             e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" fill="%23f3f4f6"><rect width="400" height="400"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="20">No Image</text></svg>'
                                         }}
@@ -728,9 +735,16 @@ const ProductDetail = () => {
                                                     title={color.name}
                                                 >
                                                     <img
-                                                        src={color.thumb}
+                                                        src={(() => {
+                                                            const originalSrc = color.thumb;
+                                                            if (originalSrc && originalSrc.includes('absoluteapparel.co.uk')) {
+                                                                return `https://images.weserv.nl/?url=${encodeURIComponent(originalSrc.replace('http://', 'https://'))}`;
+                                                            }
+                                                            return originalSrc;
+                                                        })()}
                                                         alt={color.name}
                                                         className="w-full h-full object-cover"
+                                                        referrerPolicy="no-referrer"
                                                         onError={(e) => {
                                                             e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" fill="%23e5e7eb"><rect width="56" height="56"/></svg>'
                                                         }}
@@ -1447,9 +1461,16 @@ const ProductDetail = () => {
                                 >
                                     <div className="aspect-square rounded-2xl overflow-hidden bg-gray-50 ring-2 ring-gray-100 group-hover:ring-primary transition-all">
                                         <img
-                                            src={image.url}
+                                            src={(() => {
+                                                const originalSrc = image.url;
+                                                if (originalSrc && originalSrc.includes('absoluteapparel.co.uk')) {
+                                                    return `https://images.weserv.nl/?url=${encodeURIComponent(originalSrc.replace('http://', 'https://'))}`;
+                                                }
+                                                return originalSrc;
+                                            })()}
                                             alt={`Product image ${idx + 1}`}
                                             className="w-full h-full object-cover"
+                                            referrerPolicy="no-referrer"
                                             onError={(e) => {
                                                 e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="%23e5e7eb"><rect width="100" height="100"/></svg>'
                                             }}

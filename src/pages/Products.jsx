@@ -84,7 +84,7 @@ const Products = () => {
         { label: 'Set as Best Seller', value: 'bulk-set-best-seller', icon: Star },
         { label: 'Set as Recommended', value: 'bulk-set-recommended', icon: SparklesIcon },
         { label: 'Set Markup Tier', value: 'bulk-markup', icon: Percent },
-        { label: 'Set Deactivated', value: 'deactivate', icon: PowerOff },
+        { label: 'Set Deactivated', value: 'bulk-discontinue', icon: PowerOff },
         { label: 'Export to CSV', value: 'export', icon: Download },
         { label: 'Remove Promotion Tags', value: 'bulk-remove-featured', icon: X, danger: true },
     ]
@@ -719,10 +719,12 @@ const Products = () => {
                 await handleSaveDisplayOrder()
                 break
             case 'activate':
-                await handleBulkStatus(true)
+            case 'bulk-activate':
+                await handleBulkActivate()
                 break
             case 'deactivate':
-                await handleBulkStatus(false)
+            case 'bulk-discontinue':
+                await handleBulkDiscontinue()
                 break
             case 'export':
                 handleExportCSV()
@@ -732,12 +734,6 @@ const Products = () => {
                 break
             case 'rebalance':
                 rebalanceSequence()
-                break
-            case 'bulk-discontinue':
-                await handleBulkDiscontinue()
-                break
-            case 'bulk-activate':
-                await handleBulkActivate()
                 break
             case 'bulk-markup':
                 await fetchMarkupRules()
@@ -833,40 +829,6 @@ const Products = () => {
             await fetchProducts()
 
             setTimeout(() => setSuccessMessage(null), 5000)
-
-        } catch (err) {
-            setError(err.message)
-        } finally {
-            setProcessing(false)
-        }
-    }
-
-    const handleBulkStatus = async (isActive) => {
-        const codes = Array.from(selectedProducts.keys())
-
-        try {
-            setProcessing(true)
-            setError(null)
-
-            const response = await fetch(`${API_BASE}/api/products/bulk-status`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    product_codes: codes,
-                    is_active: isActive
-                })
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to update product status')
-            }
-
-            setSuccessMessage(`Products ${isActive ? 'activated' : 'deactivated'} successfully`)
-            setSelectedProducts(new Map())
-            setSelectedAction('')
-            await fetchProducts()
-
-            setTimeout(() => setSuccessMessage(null), 3000)
 
         } catch (err) {
             setError(err.message)
@@ -1505,9 +1467,16 @@ const Products = () => {
                                                     <td className="py-3 px-4">
                                                         <div className="w-12 h-12 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
                                                             <img
-                                                                src={(product.image && product.image !== 'Not available') ? product.image : (product.colors?.[0]?.thumb || product.colors?.[0]?.main)}
+                                                                src={(() => {
+                                                                    const originalSrc = (product.image && product.image !== 'Not available') ? product.image : (product.colors?.[0]?.thumb || product.colors?.[0]?.main);
+                                                                    if (originalSrc && originalSrc.includes('absoluteapparel.co.uk')) {
+                                                                        return `https://images.weserv.nl/?url=${encodeURIComponent(originalSrc.replace('http://', 'https://'))}`;
+                                                                    }
+                                                                    return originalSrc;
+                                                                })()}
                                                                 alt={product.name}
                                                                 className="w-full h-full object-contain"
+                                                                referrerPolicy="no-referrer"
                                                                 onError={(e) => {
                                                                     e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="%23f3f4f6"><rect width="40" height="40"/></svg>'
                                                                 }}
