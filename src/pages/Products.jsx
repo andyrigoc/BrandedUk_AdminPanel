@@ -1353,7 +1353,7 @@ const Products = () => {
                                         <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Code</th>
                                         <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Product Name</th>
                                         <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Brand</th>
-                                        <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Type</th>
+                                        <th className="py-3 px-4 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Supplier</th>
                                         <th className="py-3 px-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sell Price</th>
                                         <th className="py-3 px-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Actions</th>
                                     </tr>
@@ -1383,7 +1383,11 @@ const Products = () => {
                                             return (
                                                 <tr
                                                     key={code}
-                                                    className={`border-b border-gray-50 transition-colors
+                                                    onClick={(e) => {
+                                                        if (e.target.type === 'checkbox' || e.target.closest('button') || e.target.tagName === 'INPUT') return;
+                                                        navigate(`/products/${code}`);
+                                                    }}
+                                                    className={`border-b border-gray-50 transition-colors cursor-pointer
                                                     ${selected ? 'bg-primary/5' : isPinned ? 'bg-[#FFFBEB]' : 'hover:bg-gray-50'}`}
                                                 >
                                                     {/* Checkbox */}
@@ -1512,11 +1516,31 @@ const Products = () => {
                                                         {product.brand}
                                                     </td>
 
-                                                    {/* Type */}
-                                                    <td className="py-3 px-4">
-                                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded uppercase">
-                                                            {product.productType || 'N/A'}
-                                                        </span>
+                                                    {/* Supplier */}
+                                                    <td className="py-3 px-4 text-center">
+                                                        {(() => {
+                                                            const s = (product.supplier || '').toLowerCase();
+                                                            if (s.includes('ralawise')) {
+                                                                return (
+                                                                    <div className="w-7 h-7 mx-auto rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[11px] font-bold text-blue-600" title="Ralawise">
+                                                                        R
+                                                                    </div>
+                                                                );
+                                                            } else if (s.includes('uneek')) {
+                                                                return (
+                                                                    <div className="w-7 h-7 mx-auto rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-[11px] font-bold text-emerald-600" title="Uneek">
+                                                                        U
+                                                                    </div>
+                                                                );
+                                                            } else if (s.includes('absolut')) {
+                                                                return (
+                                                                    <div className="w-7 h-7 mx-auto rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-[11px] font-bold text-amber-600" title="Absolute Apparel">
+                                                                        A
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return <span className="text-slate-400 text-xs">—</span>;
+                                                        })()}
                                                     </td>
 
                                                     {/* Price */}

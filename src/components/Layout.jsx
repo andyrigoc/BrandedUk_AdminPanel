@@ -448,6 +448,9 @@ const Layout = ({ children, onLogout }) => {
                                 <span className="text-[11px] font-bold text-primary/70 uppercase tracking-tighter">{p.brand}</span>
                               </div>
                             </div>
+                            {p.price !== undefined && p.price !== null && (
+                              <span className="text-sm font-bold text-primary px-2">£{Number(p.price).toFixed(2)}</span>
+                            )}
                             <ExternalLink className="w-4 h-4 text-slate-200 group-hover:text-primary transition-colors pr-2" />
                           </div>
                         ))}
