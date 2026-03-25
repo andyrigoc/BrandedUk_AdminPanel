@@ -5,6 +5,7 @@ import {
   Tags,
   Building2,
   Sparkles,
+  Crown,
   Settings,
   ShoppingCart,
   RefreshCw,
@@ -143,7 +144,8 @@ const Layout = ({ children, onLogout }) => {
             { name: 'Markup-override', path: '/markup-overrides' },
             { name: 'Price break override', path: '/price-overrides' },
             { name: 'Product Type', path: '/product-types' },
-            { name: 'Featured', path: '/featured' },
+            { name: 'Catalog Curator', path: '/featured' },
+            { name: 'Home Highlights', path: '/featured-products' },
           ]
         }
       ]

@@ -7,6 +7,7 @@ import DiscountTiers from './pages/DiscountTiers'
 import ProductTypes from './pages/ProductTypes'
 import Brands from './pages/Brands'
 import FeaturedProducts from './pages/FeaturedProducts'
+import FeaturedProductsManage from './pages/FeaturedProductsManage'
 import CustomizationConfig from './pages/CustomizationConfig'
 import Orders from './pages/Orders'
 import Dashboard from './pages/Dashboard'
@@ -58,6 +59,7 @@ function App() {
           <Route path="/product-types" element={<ProductTypes />} />
           <Route path="/brands" element={<Brands />} />
           <Route path="/featured" element={<FeaturedProducts />} />
+          <Route path="/featured-products" element={<FeaturedProductsManage />} />
           <Route path="/customization" element={<CustomizationConfig />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/system" element={<System />} />

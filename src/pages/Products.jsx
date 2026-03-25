@@ -5,7 +5,7 @@ import Card from '../components/Card'
 import {
     Search, ChevronLeft, ChevronRight, ChevronDown, Eye, ChevronUp, Pin, AlertTriangle,
     X, Check, Download, Trash2, Power, PowerOff, Upload, Plus, Star, ExternalLink,
-    Percent, Package, Loader2, CheckCircle2, RefreshCw, Sparkles as SparklesIcon
+    Percent, Package, Loader2, CheckCircle2, RefreshCw, Sparkles as SparklesIcon, Crown
 } from 'lucide-react'
 
 const Products = () => {
@@ -83,9 +83,11 @@ const Products = () => {
         { label: 'Rebalance Sequence', value: 'rebalance', icon: Pin },
         { label: 'Set as Best Seller', value: 'bulk-set-best-seller', icon: Star },
         { label: 'Set as Recommended', value: 'bulk-set-recommended', icon: SparklesIcon },
+        { label: 'Set as Featured', value: 'bulk-set-featured', icon: Crown },
         { label: 'Set Markup Tier', value: 'bulk-markup', icon: Percent },
         { label: 'Set Deactivated', value: 'bulk-discontinue', icon: PowerOff },
         { label: 'Export to CSV', value: 'export', icon: Download },
+        { label: 'Remove Featured', value: 'bulk-remove-featured-only', icon: Crown, danger: true },
         { label: 'Remove Promotion Tags', value: 'bulk-remove-featured', icon: X, danger: true },
     ]
 
@@ -742,13 +744,19 @@ const Products = () => {
                 setMarkupModal(true)
                 break
             case 'bulk-set-best-seller':
-                await handleBulkFeatured(true, null)
+                await handleBulkFeatured(true, null, null)
                 break
             case 'bulk-set-recommended':
-                await handleBulkFeatured(null, true)
+                await handleBulkFeatured(null, true, null)
+                break
+            case 'bulk-set-featured':
+                await handleBulkFeatured(null, null, true)
+                break
+            case 'bulk-remove-featured-only':
+                await handleBulkFeatured(null, null, false)
                 break
             case 'bulk-remove-featured':
-                await handleBulkFeatured(false, false)
+                await handleBulkFeatured(false, false, false)
                 break
             default:
                 break
@@ -984,8 +992,16 @@ const Products = () => {
         }
     }
 
-    const handleBulkFeatured = async (isBestSeller, isRecommended) => {
+    const handleBulkFeatured = async (isBestSeller, isRecommended, isFeatured, singleCode) => {
+        // If no products are selected explicitly, but we're calling from a single row toggle
+        // we might want to handle that. But the current implementation uses selectedProducts.
+        // Let's modify it to accept an optional single code.
         const codes = Array.from(selectedProducts.keys())
+        
+        // If someone called handleBulkFeatured(null, null, true, 'GD001')
+        const targetCodes = singleCode ? [singleCode] : codes;
+
+        if (targetCodes.length === 0) return;
 
         try {
             setProcessing(true)
@@ -995,9 +1011,10 @@ const Products = () => {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    style_codes: codes,
+                    style_codes: targetCodes,
                     is_best_seller: isBestSeller,
-                    is_recommended: isRecommended
+                    is_recommended: isRecommended,
+                    is_featured: isFeatured
                 })
             })
 
@@ -1006,9 +1023,9 @@ const Products = () => {
                 throw new Error(data.message || 'Failed to update featured flags')
             }
 
-            setSuccessMessage(`Featured status updated for ${codes.length} product(s)`)
-            setSelectedProducts(new Map())
-            setSelectedAction('')
+            setSuccessMessage(`Featured status updated for ${targetCodes.length} product(s)`)
+            if (!singleCode) setSelectedProducts(new Map())
+            if (!singleCode) setSelectedAction('')
             await fetchProducts()
 
             setTimeout(() => setSuccessMessage(null), 3000)
@@ -1505,6 +1522,9 @@ const Products = () => {
                                                                     {product.is_recommended && (
                                                                         <SparklesIcon className="w-3 h-3 text-indigo-500 fill-indigo-500" title="Recommended" />
                                                                     )}
+                                                                    {product.is_featured && (
+                                                                        <Crown className="w-3 h-3 text-violet-500 fill-violet-500" title="Featured" />
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                             <p className="text-xs text-gray-400">{product.productType}</p>
@@ -1552,12 +1572,24 @@ const Products = () => {
 
                                                     {/* Actions */}
                                                     <td className="py-3 px-4 text-right">
-                                                        <button
-                                                            onClick={() => navigate(`/products/${code}`)}
-                                                            className="text-gray-400 hover:text-primary transition-colors"
-                                                        >
-                                                            <ExternalLink className="w-4 h-4" />
-                                                        </button>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleBulkFeatured(null, null, !product.is_featured, code);
+                                                                }}
+                                                                className={`p-1.5 rounded transition-all ${product.is_featured ? 'text-violet-500 bg-violet-50' : 'text-slate-300 hover:text-violet-500 hover:bg-violet-50'}`}
+                                                                title={product.is_featured ? "Unfeature Product" : "Feature Product"}
+                                                            >
+                                                                <Crown className={`w-4 h-4 ${product.is_featured ? 'fill-current' : ''}`} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => navigate(`/products/${code}`)}
+                                                                className="text-gray-400 hover:text-primary transition-colors p-1.5"
+                                                            >
+                                                                <ExternalLink className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )
