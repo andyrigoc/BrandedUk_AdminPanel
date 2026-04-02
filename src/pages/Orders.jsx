@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Card from '../components/Card'
 import {
     Search,
@@ -32,6 +33,7 @@ import {
 import { API_BASE } from '../config'
 
 const Orders = () => {
+    const [searchParams] = useSearchParams()
     const [orders, setOrders] = useState([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -42,10 +44,27 @@ const Orders = () => {
     const [sortOrder, setSortOrder] = useState('desc')
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(null)
     const [deletingOrder, setDeletingOrder] = useState(null)
+    const requestedOpenOrderId = searchParams.get('open')
 
     useEffect(() => {
         fetchOrders()
     }, [statusFilter])
+
+    useEffect(() => {
+        if (!requestedOpenOrderId || orders.length === 0) return
+
+        const targetOrder = orders.find((order) => String(order.id) === String(requestedOpenOrderId))
+        if (!targetOrder) return
+
+        setExpandedOrder(targetOrder.id)
+
+        const timeoutId = window.setTimeout(() => {
+            const element = document.getElementById(`invoice-content-${targetOrder.id}`)
+            element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 150)
+
+        return () => window.clearTimeout(timeoutId)
+    }, [orders, requestedOpenOrderId])
 
     const fetchOrders = async () => {
         setLoading(true)

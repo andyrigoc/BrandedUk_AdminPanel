@@ -6,12 +6,10 @@ import {
     ShoppingCart,
     Users,
     CreditCard,
-    ArrowRight,
     Loader2,
     Clock,
     CheckCircle2,
     XCircle,
-    AlertCircle,
     Trash2,
     ArrowDown,
     ArrowUp,
@@ -24,7 +22,6 @@ const Dashboard = () => {
     const navigate = useNavigate()
     const [loading, setLoading] = useState(true)
 
-    // Real Metrics State
     const [metrics, setMetrics] = useState({
         revenue: 0,
         orders: 0,
@@ -34,10 +31,10 @@ const Dashboard = () => {
 
     const [recentOrders, setRecentOrders] = useState([])
     const [selectedOrders, setSelectedOrders] = useState([])
-    const [updatingStatus, setUpdatingStatus] = useState(null)
+    const [deletingOrderIds, setDeletingOrderIds] = useState([])
+    const [bulkDeleting, setBulkDeleting] = useState(false)
     const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' })
 
-    // Helper to extract total from quote
     const getOrderTotal = (quote) => {
         try {
             let amount = parseFloat(quote.total_amount)
@@ -63,58 +60,58 @@ const Dashboard = () => {
         }
     }
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true)
+    const fetchData = async ({ showLoading = true } = {}) => {
+        try {
+            if (showLoading) setLoading(true)
 
-                const quotesRes = await fetch(`${API_BASE}/api/admin/quotes?limit=1000`)
-                if (!quotesRes.ok) throw new Error('Failed to fetch sales data')
-                const quotesData = await quotesRes.json()
-                const allQuotes = quotesData.items || []
+            const quotesRes = await fetch(`${API_BASE}/api/admin/quotes?limit=1000`)
+            if (!quotesRes.ok) throw new Error('Failed to fetch sales data')
+            const quotesData = await quotesRes.json()
+            const allQuotes = quotesData.items || []
 
-                const totalRevenue = allQuotes.reduce((sum, quote) => sum + getOrderTotal(quote), 0)
-                const uniqueCustomers = new Set(allQuotes.map(q => q.customer_email || q.customer_name)).size
+            const totalRevenue = allQuotes.reduce((sum, quote) => sum + getOrderTotal(quote), 0)
+            const uniqueCustomers = new Set(allQuotes.map(q => q.customer_email || q.customer_name)).size
 
-                const productsRes = await fetch(`${API_BASE}/api/products?limit=1`)
-                const productsData = await productsRes.json()
-                const totalProducts = productsData.total || productsData.pagination?.totalItems || 0
+            const productsRes = await fetch(`${API_BASE}/api/products?limit=1`)
+            const productsData = await productsRes.json()
+            const totalProducts = productsData.total || productsData.pagination?.totalItems || 0
 
-                setMetrics({
-                    revenue: totalRevenue,
-                    orders: allQuotes.length,
-                    customers: uniqueCustomers,
-                    products: totalProducts
-                })
+            setMetrics({
+                revenue: totalRevenue,
+                orders: allQuotes.length,
+                customers: uniqueCustomers,
+                products: totalProducts
+            })
 
-                const recent = allQuotes.slice(0, 10).map(q => {
-                    const data = parseQuoteData(q)
-                    const itemsCount = (data.basket || []).reduce((acc, item) => acc + (parseInt(item.quantity) || 0), 0)
-                    const totalVal = getOrderTotal(q)
+            const recent = allQuotes.slice(0, 10).map(q => {
+                const data = parseQuoteData(q)
+                const itemsCount = (data.basket || []).reduce((acc, item) => acc + (parseInt(item.quantity) || 0), 0)
+                const totalVal = getOrderTotal(q)
 
-                    return {
-                        id: `#${q.id}`,
-                        rawId: q.id,
-                        customer: q.customer_name || 'Guest',
-                        email: q.customer_email,
-                        items: itemsCount,
-                        total: `£${totalVal.toFixed(2)}`,
-                        rawTotal: totalVal,
-                        status: q.status || 'Pending',
-                        date: new Date(q.created_at).toLocaleDateString(),
-                        rawDate: new Date(q.created_at).getTime(),
-                        initial: (q.customer_name || 'G').charAt(0).toUpperCase()
-                    }
-                })
-                setRecentOrders(recent)
+                return {
+                    id: `#${q.id}`,
+                    rawId: q.id,
+                    customer: q.customer_name || 'Guest',
+                    email: q.customer_email,
+                    items: itemsCount,
+                    total: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(totalVal),
+                    rawTotal: totalVal,
+                    status: q.status || 'Pending',
+                    date: new Date(q.created_at).toLocaleDateString(),
+                    rawDate: new Date(q.created_at).getTime(),
+                    initial: (q.customer_name || 'G').charAt(0).toUpperCase()
+                }
+            })
 
-            } catch (err) {
-                console.error("Dashboard Error:", err)
-            } finally {
-                setLoading(false)
-            }
+            setRecentOrders(recent)
+        } catch (err) {
+            console.error('Dashboard Error:', err)
+        } finally {
+            if (showLoading) setLoading(false)
         }
+    }
 
+    useEffect(() => {
         fetchData()
     }, [])
 
@@ -130,6 +127,75 @@ const Dashboard = () => {
         setSortConfig({ key, direction })
     }
 
+    const openOrder = (orderId) => {
+        navigate(`/orders?open=${encodeURIComponent(orderId)}`)
+    }
+
+    const deleteOrders = async (orderIds) => {
+        const results = await Promise.allSettled(
+            orderIds.map(async (orderId) => {
+                const response = await fetch(`${API_BASE}/api/admin/quotes/${orderId}`, {
+                    method: 'DELETE'
+                })
+
+                if (!response.ok) {
+                    throw new Error(`Failed to delete order ${orderId}`)
+                }
+
+                return orderId
+            })
+        )
+
+        const deletedIds = results
+            .filter(result => result.status === 'fulfilled')
+            .map(result => result.value)
+
+        const failedCount = results.length - deletedIds.length
+
+        if (deletedIds.length > 0) {
+            setSelectedOrders(prev => prev.filter(id => !deletedIds.includes(id)))
+            await fetchData({ showLoading: false })
+        }
+
+        if (failedCount > 0) {
+            window.alert(
+                deletedIds.length > 0
+                    ? `${deletedIds.length} order(s) deleted, but ${failedCount} failed.`
+                    : 'Failed to delete the selected order(s).'
+            )
+        }
+    }
+
+    const handleDeleteOrder = async (order) => {
+        const confirmed = window.confirm(`Delete order ${order.id} for ${order.customer}?`)
+        if (!confirmed) return
+
+        setDeletingOrderIds(prev => [...prev, order.rawId])
+
+        try {
+            await deleteOrders([order.rawId])
+        } finally {
+            setDeletingOrderIds(prev => prev.filter(id => id !== order.rawId))
+        }
+    }
+
+    const handleBulkDelete = async () => {
+        if (selectedOrders.length === 0) return
+
+        const confirmed = window.confirm(
+            `Delete ${selectedOrders.length} selected order(s)? This action cannot be undone.`
+        )
+        if (!confirmed) return
+
+        setBulkDeleting(true)
+
+        try {
+            await deleteOrders(selectedOrders)
+        } finally {
+            setBulkDeleting(false)
+        }
+    }
+
     const sortedOrders = [...recentOrders].sort((a, b) => {
         const aVal = a[sortConfig.key === 'id' ? 'rawId' : sortConfig.key === 'date' ? 'rawDate' : sortConfig.key === 'total' ? 'rawTotal' : sortConfig.key]
         const bVal = b[sortConfig.key === 'id' ? 'rawId' : sortConfig.key === 'date' ? 'rawDate' : sortConfig.key === 'total' ? 'rawTotal' : sortConfig.key]
@@ -138,14 +204,6 @@ const Dashboard = () => {
         if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
         return 0
     })
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'Shipped': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            case 'Cancelled': return <XCircle className="w-4 h-4 text-rose-500" />
-            default: return <Clock className="w-4 h-4 text-amber-500" />
-        }
-    }
 
     if (loading) {
         return (
@@ -160,7 +218,6 @@ const Dashboard = () => {
 
     return (
         <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-in fade-in duration-500 font-sans">
-            {/* Header */}
             <div className="flex items-center justify-between mb-8">
                 <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
                 <div className="text-sm text-slate-500">Overview of your store</div>
@@ -208,7 +265,6 @@ const Dashboard = () => {
                 </Card>
             </div>
 
-            {/* All Orders Section */}
             <Card className="border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white mt-8">
                 <div className="px-6 py-5 flex items-center justify-between mb-2">
                     <h2 className="text-lg font-bold text-slate-900">All Orders</h2>
@@ -217,7 +273,6 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Bulk Action Bar */}
                 {selectedOrders.length > 0 && (
                     <div className="mx-6 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between animate-in slide-in-from-top-2 duration-300">
                         <div className="flex items-center gap-3">
@@ -241,8 +296,12 @@ const Dashboard = () => {
                                 </div>
                             </div>
                             <div className="w-px h-5 bg-slate-200"></div>
-                            <button className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-rose-500 hover:bg-rose-50 rounded transition-all">
-                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={bulkDeleting}
+                                className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-rose-500 hover:bg-rose-50 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" /> {bulkDeleting ? 'Deleting...' : 'Delete'}
                             </button>
                         </div>
                     </div>
@@ -253,19 +312,19 @@ const Dashboard = () => {
                         <thead>
                             <tr className="border-y border-slate-100 bg-slate-50/50">
                                 <th className="pl-6 pr-4 py-3 w-12">
-                                    <input 
-                                        type="checkbox" 
+                                    <input
+                                        type="checkbox"
                                         className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                                         checked={selectedOrders.length === recentOrders.length && recentOrders.length > 0}
                                         onChange={(e) => {
-                                            if (e.target.checked) setSelectedOrders(recentOrders.map(o => o.id))
+                                            if (e.target.checked) setSelectedOrders(recentOrders.map(o => o.rawId))
                                             else setSelectedOrders([])
                                         }}
                                     />
                                 </th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                     <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-700 group" onClick={() => handleSort('id')}>
-                                        ORDER ID 
+                                        ORDER ID
                                         {sortConfig.key === 'id' ? (
                                             sortConfig.direction === 'desc' ? <ArrowDown className="w-3 h-3 text-primary" /> : <ArrowUp className="w-3 h-3 text-primary" />
                                         ) : (
@@ -275,7 +334,7 @@ const Dashboard = () => {
                                 </th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                     <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-700 group" onClick={() => handleSort('date')}>
-                                        DATE 
+                                        DATE
                                         {sortConfig.key === 'date' ? (
                                             sortConfig.direction === 'desc' ? <ArrowDown className="w-3 h-3 text-primary" /> : <ArrowUp className="w-3 h-3 text-primary" />
                                         ) : (
@@ -287,7 +346,7 @@ const Dashboard = () => {
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                     <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-700 group" onClick={() => handleSort('total')}>
-                                        TOTAL 
+                                        TOTAL
                                         {sortConfig.key === 'total' ? (
                                             sortConfig.direction === 'desc' ? <ArrowDown className="w-3 h-3 text-primary" /> : <ArrowUp className="w-3 h-3 text-primary" />
                                         ) : (
@@ -306,40 +365,40 @@ const Dashboard = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                sortedOrders.map((order, idx) => {
-                                    const isSelected = selectedOrders.includes(order.id)
+                                sortedOrders.map((order) => {
+                                    const isSelected = selectedOrders.includes(order.rawId)
+                                    const isDeleting = deletingOrderIds.includes(order.rawId)
                                     const statusColors = {
                                         Completed: { text: 'text-emerald-600', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
                                         Pending: { text: 'text-amber-500', icon: <Clock className="w-3.5 h-3.5" /> },
                                         Processing: { text: 'text-blue-500', icon: <Loader2 className="w-3.5 h-3.5" /> },
                                         Cancelled: { text: 'text-rose-500', icon: <XCircle className="w-3.5 h-3.5" /> }
                                     }
-                                    const config = statusColors[order.status] || statusColors['Pending']
+                                    const config = statusColors[order.status] || statusColors.Pending
 
                                     return (
-                                        <tr 
-                                            key={idx} 
-                                            className={`transition-colors hover:bg-slate-50 group
-                                                ${isSelected ? 'bg-primary/5' : ''}`}
+                                        <tr
+                                            key={order.rawId}
+                                            className={`transition-colors hover:bg-slate-50 group ${isSelected ? 'bg-primary/5' : ''}`}
                                         >
                                             <td className="pl-6 pr-4 py-4">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                                                     checked={isSelected}
                                                     onChange={(e) => {
-                                                        if (e.target.checked) setSelectedOrders(prev => [...prev, order.id])
-                                                        else setSelectedOrders(prev => prev.filter(id => id !== order.id))
+                                                        if (e.target.checked) setSelectedOrders(prev => [...prev, order.rawId])
+                                                        else setSelectedOrders(prev => prev.filter(id => id !== order.rawId))
                                                     }}
                                                 />
                                             </td>
-                                            <td className="px-4 py-4 cursor-pointer" onClick={() => navigate('/orders')}>
+                                            <td className="px-4 py-4 cursor-pointer" onClick={() => openOrder(order.rawId)}>
                                                 <span className="font-semibold text-slate-900 text-sm">{order.id}</span>
                                             </td>
-                                            <td className="px-4 py-4 cursor-pointer" onClick={() => navigate('/orders')}>
+                                            <td className="px-4 py-4 cursor-pointer" onClick={() => openOrder(order.rawId)}>
                                                 <span className="text-sm text-slate-600 font-medium">{order.date}</span>
                                             </td>
-                                            <td className="px-4 py-4 cursor-pointer" onClick={() => navigate('/orders')}>
+                                            <td className="px-4 py-4 cursor-pointer" onClick={() => openOrder(order.rawId)}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-7 h-7 rounded-full bg-purple-50 flex items-center justify-center text-xs font-semibold text-purple-600">
                                                         {order.initial}
@@ -347,17 +406,22 @@ const Dashboard = () => {
                                                     <span className="text-sm font-medium text-purple-700">{order.customer}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-4 cursor-pointer" onClick={() => navigate('/orders')}>
+                                            <td className="px-4 py-4 cursor-pointer" onClick={() => openOrder(order.rawId)}>
                                                 <div className={`inline-flex items-center gap-1.5 text-sm font-medium ${config.text}`}>
                                                     {config.icon}
                                                     {order.status}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-4 cursor-pointer" onClick={() => navigate('/orders')}>
+                                            <td className="px-4 py-4 cursor-pointer" onClick={() => openOrder(order.rawId)}>
                                                 <span className="font-semibold text-slate-900 text-sm">{order.total}</span>
                                             </td>
                                             <td className="pr-6 pl-4 py-4 text-right">
-                                                <button className="p-1 text-slate-300 hover:text-slate-500 transition-colors">
+                                                <button
+                                                    onClick={() => handleDeleteOrder(order)}
+                                                    disabled={isDeleting || bulkDeleting}
+                                                    title={isDeleting ? 'Deleting order' : 'Delete order'}
+                                                    className="p-1 text-slate-300 hover:text-rose-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </td>
