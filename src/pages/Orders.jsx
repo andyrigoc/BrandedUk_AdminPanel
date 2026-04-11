@@ -18,7 +18,7 @@ import {
     User,
     MapPin,
     CreditCard,
-    DollarSign,
+    PoundSterling,
     Calendar,
     Phone,
     Mail,
@@ -472,7 +472,7 @@ const Orders = () => {
                                         : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
                                     }`}
                             >
-                                <DollarSign className="w-4 h-4" />
+                                <PoundSterling className="w-4 h-4" />
                                 <span>Price</span>
                                 {sortBy === 'price' && (
                                     sortOrder === 'desc' ? <ArrowDown className="w-3.5 h-3.5" /> : <ArrowUp className="w-3.5 h-3.5" />
@@ -494,7 +494,7 @@ const Orders = () => {
                         </div>
                         <div className="px-6 py-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 min-w-[140px]">
                             <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                <DollarSign className="w-5 h-5" />
+                                <PoundSterling className="w-5 h-5" />
                             </div>
                             <div>
                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Value</div>

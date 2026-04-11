@@ -26,7 +26,8 @@ import {
   Store,
   ShieldCheck,
   LogOut,
-  X
+  X,
+  Users
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { API_BASE } from '../config'
@@ -161,6 +162,7 @@ const Layout = ({ children, onLogout }) => {
       title: 'Operations',
       items: [
         { name: 'Orders', path: '/orders', icon: ShoppingCart },
+        { name: 'Customers', path: '/customers', icon: Users },
         { name: 'Brands', path: '/brands', icon: Building2 },
         { name: 'Customization', path: '/customization', icon: Palette },
         { name: 'System', path: '/system', icon: Settings },
@@ -178,7 +180,7 @@ const Layout = ({ children, onLogout }) => {
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans">
       {/* Sidebar - Premium Black with Purple Accents */}
-      <aside className="w-[232px] bg-[#09090b] flex flex-col z-20 border-r border-white/5 relative overflow-hidden">
+      <aside className="w-[232px] bg-[#995BD5] flex flex-col z-20 border-r border-white/20 relative overflow-hidden">
         {/* Subtle Branding Glow */}
         <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-[80px] -translate-y-16 -translate-x-16 pointer-events-none" />
 
@@ -189,8 +191,8 @@ const Layout = ({ children, onLogout }) => {
               <span className="text-white font-black text-base">B</span>
             </div>
             <div>
-              <h1 className="text-[14px] font-bold text-white tracking-tight leading-none">BrandedUK</h1>
-              <p className="text-[10px] text-primary/60 font-medium mt-1 uppercase tracking-wider">Admin</p>
+              <h1 className="text-[14px] font-extrabold text-white tracking-tight leading-none">BrandedUK</h1>
+              <p className="text-[10px] text-white/70 font-bold mt-1 uppercase tracking-wider">Admin</p>
             </div>
           </Link>
         </div>
@@ -201,7 +203,7 @@ const Layout = ({ children, onLogout }) => {
             <div key={section.title} className="space-y-3">
               <div className="flex items-center gap-2 px-4 mb-3">
                 <div className="w-1 h-1 rounded-full bg-primary/40" />
-                <h3 className="text-[12px] font-bold text-slate-500 uppercase tracking-[0.08em]">
+                <h3 className="text-[12px] font-extrabold text-white uppercase tracking-[0.08em]">
                   {section.title}
                 </h3>
               </div>
@@ -212,8 +214,8 @@ const Layout = ({ children, onLogout }) => {
                   const isExpanded = expandedMenus.includes(item.name)
                   const active = isActive(item.path) || (hasSubItems && item.subItems.some(sub => isActive(sub.path)))
 
-                  const activeStyles = "bg-primary/[0.12] text-white border-l-[3px] border-primary shadow-[inset_10px_0_15px_-10px_rgba(124,58,237,0.2)]"
-                  const inactiveStyles = "text-slate-400 hover:bg-white/[0.04] hover:text-slate-100 border-l-[3px] border-transparent"
+                  const activeStyles = "bg-white/20 text-white border-l-[3px] border-white shadow-[inset_10px_0_15px_-10px_rgba(255,255,255,0.2)]"
+                  const inactiveStyles = "text-white hover:bg-white/15 hover:text-white border-l-[3px] border-transparent font-bold"
 
                   return (
                     <div key={item.name} className="flex flex-col">
@@ -231,7 +233,7 @@ const Layout = ({ children, onLogout }) => {
                               className="flex items-center flex-1"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Icon className={`w-3.5 h-3.5 mr-3 flex-shrink-0 ${active ? 'text-primary' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                              <Icon className={`w-3.5 h-3.5 mr-3 flex-shrink-0 text-white`} />
                               <span className="tracking-tight">{item.name}</span>
                             </Link>
                             <div className="p-1 -mr-1 hover:bg-white/10 rounded-sm transition-colors" onClick={(e) => { e.stopPropagation(); toggleMenu(item.name); }}>
@@ -248,7 +250,7 @@ const Layout = ({ children, onLogout }) => {
                           `}
                         >
                           <div className="flex items-center">
-                            <Icon className={`w-3.5 h-3.5 mr-3 flex-shrink-0 ${active ? 'text-primary' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                            <Icon className={`w-3.5 h-3.5 mr-3 flex-shrink-0 text-white`} />
                             <span className="tracking-tight">{item.name}</span>
                           </div>
                           {item.badge && (
@@ -271,8 +273,8 @@ const Layout = ({ children, onLogout }) => {
                                 className={`
                                   flex items-center px-4 py-2 text-[12px] font-normal transition-all
                                   ${subActive
-                                    ? 'text-primary font-medium'
-                                    : 'text-slate-500 hover:text-slate-200'
+                                    ? 'text-white font-bold'
+                                    : 'text-white/80 hover:text-white font-semibold'
                                   }
                                 `}
                               >
@@ -291,7 +293,7 @@ const Layout = ({ children, onLogout }) => {
         </nav>
 
         {/* System Controls - Premium High-Visibility Action */}
-        <div className="px-3 pb-6 pt-6 border-t border-white/5 bg-white/[0.02]">
+        <div className="px-3 pb-6 pt-6 border-t border-white/20 bg-white/[0.05]">
           <div className="space-y-3">
             <button
               onClick={() => setShowSyncModal(true)}
