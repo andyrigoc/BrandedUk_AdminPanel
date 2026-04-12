@@ -678,12 +678,8 @@ const Dashboard = () => {
                                             <td className="px-4 py-4 cursor-pointer" onClick={() => openOrder(order.rawId)}>
                                                 <span className="font-semibold text-slate-900 text-sm">{order.id}</span>
                                             </td>
-                                            <td className="px-4 py-4 cursor-pointer" onClick={(e) => {
-                                                e.stopPropagation()
-                                                const d = new Date(order.rawDate)
-                                                navigate(`/calendar?date=${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
-                                            }}>
-                                                <span className="text-sm text-[#995BD5] font-semibold hover:underline cursor-pointer">{order.date}</span>
+                                            <td className="px-4 py-4 cursor-pointer" onClick={() => openOrder(order.rawId)}>
+                                                <span className="text-sm text-slate-600 font-medium">{order.date}</span>
                                             </td>
                                             <td className="px-4 py-4 cursor-pointer" onClick={() => openOrder(order.rawId)}>
                                                 <div className="flex items-center gap-3">

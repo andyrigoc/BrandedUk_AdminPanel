@@ -341,6 +341,8 @@ const Orders = () => {
     const parseQuoteData = (order) => {
         try {
             const data = typeof order.quote_data === 'string' ? JSON.parse(order.quote_data) : order.quote_data
+            // DEBUG: remove after checking
+            console.log('QUOTE_DATA KEYS:', Object.keys(data || {}), 'logos:', data?.logos, 'customizations:', data?.customizations?.map(c => ({ hasLogo: c.hasLogo, logo: c.logo, position: c.position })))
             return {
                 basket: data?.basket || [],
                 customizations: data?.customizations || [],
@@ -739,92 +741,42 @@ const Orders = () => {
 
                                                     {/* Uploaded Logos Section */}
                                                     {(() => {
-                                                        // Helper to resolve any logo reference to a displayable URL
-                                                        const resolveLogoUrl = (logoRef) => {
-                                                            if (!logoRef) return null
-                                                            // String: could be data-URL or a regular URL
-                                                            if (typeof logoRef === 'string') {
-                                                                if (logoRef.startsWith('data:')) return logoRef
-                                                                if (logoRef.startsWith('http')) return logoRef.replace('http://localhost:3004', API_BASE).replace('http://127.0.0.1:3004', API_BASE)
-                                                                if (logoRef.startsWith('/')) return `${API_BASE}${logoRef}`
-                                                                if (logoRef.length > 20) return `${API_BASE}/${logoRef}` // relative path
-                                                                return null
-                                                            }
-                                                            // Object with various possible keys
-                                                            if (typeof logoRef === 'object') {
-                                                                if (logoRef.dataUrl) return logoRef.dataUrl
-                                                                if (logoRef.dataURL) return logoRef.dataURL
-                                                                if (logoRef.data) return logoRef.data
-                                                                if (logoRef.src) return logoRef.src
-                                                                if (logoRef.relativePath) return `${API_BASE}/${logoRef.relativePath}`
-                                                                if (logoRef.url) return logoRef.url.replace('http://localhost:3004', API_BASE).replace('http://127.0.0.1:3004', API_BASE)
-                                                                if (logoRef.path) return `${API_BASE}/${logoRef.path}`
-                                                                // Try to find any string value that looks like a URL or data-URL
-                                                                const vals = Object.values(logoRef)
-                                                                for (const v of vals) {
-                                                                    if (typeof v === 'string' && (v.startsWith('data:') || v.startsWith('http') || v.startsWith('/'))) {
-                                                                        return v.startsWith('http') ? v.replace('http://localhost:3004', API_BASE).replace('http://127.0.0.1:3004', API_BASE) : v.startsWith('/') ? `${API_BASE}${v}` : v
-                                                                    }
-                                                                }
-                                                            }
-                                                            return null
-                                                        }
-
-                                                        const getLogoName = (logoRef) => {
-                                                            if (!logoRef || typeof logoRef === 'string') return 'logo.png'
-                                                            return logoRef.originalName || logoRef.fileName || logoRef.name || 'logo.png'
-                                                        }
-
+                                                        // Collect all logos from customizations and logos object
                                                         const allLogos = []
-                                                        const seenUrls = new Set()
 
                                                         // From customizations
                                                         customizations.forEach((cust, idx) => {
-                                                            // Try multiple possible logo fields
-                                                            const candidates = [cust.logo, cust.logoData, cust.logoUrl, cust.logoDataUrl, cust.image]
-                                                            let found = false
-                                                            for (const candidate of candidates) {
-                                                                const url = resolveLogoUrl(candidate)
-                                                                if (url && !seenUrls.has(url.slice(0, 100))) {
-                                                                    seenUrls.add(url.slice(0, 100))
-                                                                    allLogos.push({
-                                                                        url,
-                                                                        name: getLogoName(candidate),
-                                                                        position: cust.position || cust.positionSlug || `Logo ${idx + 1}`,
-                                                                        isDataUrl: url.startsWith('data:')
-                                                                    })
-                                                                    found = true
-                                                                    break
-                                                                }
-                                                            }
-                                                            // Fallback: check logos object with position key
-                                                            if (!found && cust.hasLogo && logos) {
+                                                            let logoObj = cust.logo
+                                                            if (!logoObj && cust.hasLogo && logos) {
                                                                 const key = cust.positionSlug || cust.position
-                                                                const logoObj = logos[key] || Object.values(logos).find(l => l) || null
-                                                                const url = resolveLogoUrl(logoObj)
-                                                                if (url && !seenUrls.has(url.slice(0, 100))) {
-                                                                    seenUrls.add(url.slice(0, 100))
+                                                                logoObj = logos[key] || Object.values(logos).find(l => l && l.relativePath) || Object.values(logos)[0]
+                                                            }
+                                                            if (logoObj) {
+                                                                const imgUrl = logoObj.relativePath
+                                                                    ? `${API_BASE}/${logoObj.relativePath}`
+                                                                    : (logoObj.url || '').replace('http://localhost:3004', API_BASE).replace('http://127.0.0.1:3004', API_BASE)
+                                                                if (imgUrl) {
                                                                     allLogos.push({
-                                                                        url,
-                                                                        name: getLogoName(logoObj),
-                                                                        position: cust.position || cust.positionSlug || `Logo ${idx + 1}`,
-                                                                        isDataUrl: url.startsWith('data:')
+                                                                        url: imgUrl,
+                                                                        name: logoObj.originalName || 'logo.png',
+                                                                        position: cust.position || cust.positionSlug || `Logo ${idx + 1}`
                                                                     })
                                                                 }
                                                             }
                                                         })
 
-                                                        // From logos object directly
+                                                        // From logos object directly (catch any not tied to a customization)
                                                         if (logos && typeof logos === 'object') {
-                                                            Object.entries(logos).forEach(([key, logoRef]) => {
-                                                                const url = resolveLogoUrl(logoRef)
-                                                                if (url && !seenUrls.has(url.slice(0, 100))) {
-                                                                    seenUrls.add(url.slice(0, 100))
+                                                            Object.entries(logos).forEach(([key, logoObj]) => {
+                                                                if (!logoObj) return
+                                                                const imgUrl = logoObj.relativePath
+                                                                    ? `${API_BASE}/${logoObj.relativePath}`
+                                                                    : (logoObj.url || '').replace('http://localhost:3004', API_BASE).replace('http://127.0.0.1:3004', API_BASE)
+                                                                if (imgUrl && !allLogos.some(l => l.url === imgUrl)) {
                                                                     allLogos.push({
-                                                                        url,
-                                                                        name: getLogoName(logoRef),
-                                                                        position: key,
-                                                                        isDataUrl: url.startsWith('data:')
+                                                                        url: imgUrl,
+                                                                        name: logoObj.originalName || 'logo.png',
+                                                                        position: key
                                                                     })
                                                                 }
                                                             })
@@ -835,7 +787,7 @@ const Orders = () => {
                                                         return (
                                                             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                                                                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                                                    <ImageIcon className="w-4 h-4 text-primary" /> Uploaded Logos ({allLogos.length})
+                                                                    <ImageIcon className="w-4 h-4 text-primary" /> Uploaded Logos
                                                                 </h4>
                                                                 <div className="space-y-4">
                                                                     {allLogos.map((logo, idx) => (
@@ -861,38 +813,19 @@ const Orders = () => {
                                                                                     data-html2canvas-ignore="true"
                                                                                     onClick={(e) => {
                                                                                         e.preventDefault()
-                                                                                        if (logo.isDataUrl) {
-                                                                                            // Convert data-URL to blob for download
-                                                                                            const [header, b64] = logo.url.split(',')
-                                                                                            const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
-                                                                                            const byteStr = atob(b64)
-                                                                                            const ab = new ArrayBuffer(byteStr.length)
-                                                                                            const ia = new Uint8Array(ab)
-                                                                                            for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i)
-                                                                                            const blob = new Blob([ab], { type: mime })
-                                                                                            const url = window.URL.createObjectURL(blob)
-                                                                                            const a = document.createElement('a')
-                                                                                            a.href = url
-                                                                                            a.download = logo.name
-                                                                                            document.body.appendChild(a)
-                                                                                            a.click()
-                                                                                            window.URL.revokeObjectURL(url)
-                                                                                            document.body.removeChild(a)
-                                                                                        } else {
-                                                                                            fetch(logo.url)
-                                                                                                .then(res => res.blob())
-                                                                                                .then(blob => {
-                                                                                                    const url = window.URL.createObjectURL(blob)
-                                                                                                    const a = document.createElement('a')
-                                                                                                    a.href = url
-                                                                                                    a.download = logo.name
-                                                                                                    document.body.appendChild(a)
-                                                                                                    a.click()
-                                                                                                    window.URL.revokeObjectURL(url)
-                                                                                                    document.body.removeChild(a)
-                                                                                                })
-                                                                                                .catch(() => window.open(logo.url, '_blank'))
-                                                                                        }
+                                                                                        fetch(logo.url)
+                                                                                            .then(res => res.blob())
+                                                                                            .then(blob => {
+                                                                                                const url = window.URL.createObjectURL(blob)
+                                                                                                const a = document.createElement('a')
+                                                                                                a.href = url
+                                                                                                a.download = logo.name
+                                                                                                document.body.appendChild(a)
+                                                                                                a.click()
+                                                                                                window.URL.revokeObjectURL(url)
+                                                                                                document.body.removeChild(a)
+                                                                                            })
+                                                                                            .catch(() => window.open(logo.url, '_blank'))
                                                                                     }}
                                                                                     className="w-full inline-flex justify-center items-center gap-2 text-xs font-bold text-white bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg px-4 py-2.5 rounded-xl transition-all"
                                                                                 >

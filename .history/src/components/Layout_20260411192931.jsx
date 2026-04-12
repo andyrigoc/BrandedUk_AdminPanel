@@ -26,9 +26,7 @@ import {
   Store,
   ShieldCheck,
   LogOut,
-  X,
-  Users,
-  CalendarDays
+  X
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { API_BASE } from '../config'
@@ -132,7 +130,6 @@ const Layout = ({ children, onLogout }) => {
       title: 'Navigation',
       items: [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-        { name: 'Calendar', path: '/calendar', icon: CalendarDays },
       ]
     },
     {
@@ -164,7 +161,6 @@ const Layout = ({ children, onLogout }) => {
       title: 'Operations',
       items: [
         { name: 'Orders', path: '/orders', icon: ShoppingCart },
-        { name: 'Customers', path: '/customers', icon: Users },
         { name: 'Brands', path: '/brands', icon: Building2 },
         { name: 'Customization', path: '/customization', icon: Palette },
         { name: 'System', path: '/system', icon: Settings },
@@ -182,7 +178,7 @@ const Layout = ({ children, onLogout }) => {
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans">
       {/* Sidebar - Premium Black with Purple Accents */}
-      <aside className="w-[232px] bg-[#71717a] flex flex-col z-20 border-r border-white/20 relative overflow-hidden">
+      <aside className="w-[232px] bg-[#995BD5] flex flex-col z-20 border-r border-white/20 relative overflow-hidden">
         {/* Subtle Branding Glow */}
         <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-[80px] -translate-y-16 -translate-x-16 pointer-events-none" />
 
@@ -193,8 +189,8 @@ const Layout = ({ children, onLogout }) => {
               <span className="text-white font-black text-base">B</span>
             </div>
             <div>
-              <h1 className="text-[14px] font-extrabold text-white tracking-tight leading-none">BrandedUK</h1>
-              <p className="text-[10px] text-white/70 font-bold mt-1 uppercase tracking-wider">Admin</p>
+              <h1 className="text-[14px] font-bold text-white tracking-tight leading-none">BrandedUK</h1>
+              <p className="text-[10px] text-primary/60 font-medium mt-1 uppercase tracking-wider">Admin</p>
             </div>
           </Link>
         </div>
@@ -205,7 +201,7 @@ const Layout = ({ children, onLogout }) => {
             <div key={section.title} className="space-y-3">
               <div className="flex items-center gap-2 px-4 mb-3">
                 <div className="w-1 h-1 rounded-full bg-primary/40" />
-                <h3 className="text-[12px] font-extrabold text-white uppercase tracking-[0.08em]">
+                <h3 className="text-[12px] font-bold text-white/70 uppercase tracking-[0.08em]">
                   {section.title}
                 </h3>
               </div>
@@ -217,7 +213,7 @@ const Layout = ({ children, onLogout }) => {
                   const active = isActive(item.path) || (hasSubItems && item.subItems.some(sub => isActive(sub.path)))
 
                   const activeStyles = "bg-white/20 text-white border-l-[3px] border-white shadow-[inset_10px_0_15px_-10px_rgba(255,255,255,0.2)]"
-                  const inactiveStyles = "text-white hover:bg-white/15 hover:text-white border-l-[3px] border-transparent font-bold"
+                  const inactiveStyles = "text-white/80 hover:bg-white/10 hover:text-white border-l-[3px] border-transparent"
 
                   return (
                     <div key={item.name} className="flex flex-col">
@@ -235,7 +231,7 @@ const Layout = ({ children, onLogout }) => {
                               className="flex items-center flex-1"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Icon className={`w-3.5 h-3.5 mr-3 flex-shrink-0 text-white`} />
+                              <Icon className={`w-3.5 h-3.5 mr-3 flex-shrink-0 ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}`} />
                               <span className="tracking-tight">{item.name}</span>
                             </Link>
                             <div className="p-1 -mr-1 hover:bg-white/10 rounded-sm transition-colors" onClick={(e) => { e.stopPropagation(); toggleMenu(item.name); }}>
@@ -252,7 +248,7 @@ const Layout = ({ children, onLogout }) => {
                           `}
                         >
                           <div className="flex items-center">
-                            <Icon className={`w-3.5 h-3.5 mr-3 flex-shrink-0 text-white`} />
+                            <Icon className={`w-3.5 h-3.5 mr-3 flex-shrink-0 ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}`} />
                             <span className="tracking-tight">{item.name}</span>
                           </div>
                           {item.badge && (
@@ -275,8 +271,8 @@ const Layout = ({ children, onLogout }) => {
                                 className={`
                                   flex items-center px-4 py-2 text-[12px] font-normal transition-all
                                   ${subActive
-                                    ? 'text-white font-bold'
-                                    : 'text-white/80 hover:text-white font-semibold'
+                                    ? 'text-white font-medium'
+                                    : 'text-white/60 hover:text-white'
                                   }
                                 `}
                               >
@@ -301,16 +297,16 @@ const Layout = ({ children, onLogout }) => {
               onClick={() => setShowSyncModal(true)}
               disabled={syncing}
               className={`
-                w-full group flex items-center justify-center gap-3 px-4 py-3 text-[13px] font-extrabold transition-all duration-300 rounded-lg border relative overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.25)]
+                w-full group flex items-center justify-center gap-3 px-4 py-3 text-[13px] font-extrabold transition-all duration-300 rounded-lg border relative overflow-hidden shadow-[0_4px_20px_rgba(124,58,237,0.25)]
                 ${syncing
                   ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
-                  : 'bg-black border-black/30 text-white hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] active:scale-[0.98]'
+                  : 'bg-primary border-primary/30 text-white hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(124,58,237,0.4)] active:scale-[0.98]'
                 }
               `}
             >
               {/* Permanent Premium Gradient Bottom Layer */}
               {!syncing && (
-                <div className="absolute inset-0 bg-gradient-to-r from-[#1a1a1a] to-[#333333] z-0" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#7c3aed] to-[#9333ea] z-0" />
               )}
 
               <div className="flex items-center gap-3 relative z-10">

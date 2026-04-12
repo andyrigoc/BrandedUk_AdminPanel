@@ -12,7 +12,6 @@ import CustomizationConfig from './pages/CustomizationConfig'
 import Orders from './pages/Orders'
 import Dashboard from './pages/Dashboard'
 import Customers from './pages/Customers'
-import Calendar from './pages/Calendar'
 import System from './pages/System'
 import MarkupOverrides from './pages/MarkupOverrides'
 import PriceOverrides from './pages/PriceOverrides'
@@ -64,8 +63,6 @@ function App() {
           <Route path="/featured-products" element={<FeaturedProductsManage />} />
           <Route path="/customization" element={<CustomizationConfig />} />
           <Route path="/orders" element={<Orders />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/calendar" element={<Calendar />} />
           <Route path="/system" element={<System />} />
           <Route path="/markup-overrides" element={<MarkupOverrides />} />
           <Route path="/price-overrides" element={<PriceOverrides />} />

@@ -341,6 +341,13 @@ const Orders = () => {
     const parseQuoteData = (order) => {
         try {
             const data = typeof order.quote_data === 'string' ? JSON.parse(order.quote_data) : order.quote_data
+            // DEBUG: dump full customization and logo data
+            if (data?.customizations?.length > 0) {
+                console.log('ORDER', order.quote_id, 'FULL CUSTOMIZATIONS:', JSON.stringify(data.customizations, null, 2))
+            }
+            if (data?.logos && Object.keys(data.logos).length > 0) {
+                console.log('ORDER', order.quote_id, 'LOGOS OBJECT:', JSON.stringify(data.logos, null, 2))
+            }
             return {
                 basket: data?.basket || [],
                 customizations: data?.customizations || [],

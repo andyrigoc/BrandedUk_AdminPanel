@@ -26,9 +26,7 @@ import {
   Store,
   ShieldCheck,
   LogOut,
-  X,
-  Users,
-  CalendarDays
+  X
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { API_BASE } from '../config'
@@ -132,7 +130,6 @@ const Layout = ({ children, onLogout }) => {
       title: 'Navigation',
       items: [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-        { name: 'Calendar', path: '/calendar', icon: CalendarDays },
       ]
     },
     {
@@ -164,7 +161,6 @@ const Layout = ({ children, onLogout }) => {
       title: 'Operations',
       items: [
         { name: 'Orders', path: '/orders', icon: ShoppingCart },
-        { name: 'Customers', path: '/customers', icon: Users },
         { name: 'Brands', path: '/brands', icon: Building2 },
         { name: 'Customization', path: '/customization', icon: Palette },
         { name: 'System', path: '/system', icon: Settings },
@@ -182,7 +178,7 @@ const Layout = ({ children, onLogout }) => {
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans">
       {/* Sidebar - Premium Black with Purple Accents */}
-      <aside className="w-[232px] bg-[#71717a] flex flex-col z-20 border-r border-white/20 relative overflow-hidden">
+      <aside className="w-[232px] bg-[#995BD5] flex flex-col z-20 border-r border-white/20 relative overflow-hidden">
         {/* Subtle Branding Glow */}
         <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-[80px] -translate-y-16 -translate-x-16 pointer-events-none" />
 
@@ -301,16 +297,16 @@ const Layout = ({ children, onLogout }) => {
               onClick={() => setShowSyncModal(true)}
               disabled={syncing}
               className={`
-                w-full group flex items-center justify-center gap-3 px-4 py-3 text-[13px] font-extrabold transition-all duration-300 rounded-lg border relative overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.25)]
+                w-full group flex items-center justify-center gap-3 px-4 py-3 text-[13px] font-extrabold transition-all duration-300 rounded-lg border relative overflow-hidden shadow-[0_4px_20px_rgba(124,58,237,0.25)]
                 ${syncing
                   ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
-                  : 'bg-black border-black/30 text-white hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] active:scale-[0.98]'
+                  : 'bg-primary border-primary/30 text-white hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(124,58,237,0.4)] active:scale-[0.98]'
                 }
               `}
             >
               {/* Permanent Premium Gradient Bottom Layer */}
               {!syncing && (
-                <div className="absolute inset-0 bg-gradient-to-r from-[#1a1a1a] to-[#333333] z-0" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#7c3aed] to-[#9333ea] z-0" />
               )}
 
               <div className="flex items-center gap-3 relative z-10">
