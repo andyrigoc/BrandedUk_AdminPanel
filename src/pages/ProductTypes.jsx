@@ -27,7 +27,7 @@ const ProductTypes = () => {
             const types = (data.productTypes || []).map(t => ({
                 ...t,
                 active: t.active !== false
-            }))
+            })).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
             setProductTypes(types)
         } catch (err) {
             setError(err.message)

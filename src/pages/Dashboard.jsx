@@ -375,52 +375,52 @@ const Dashboard = () => {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="p-6 border-slate-200 shadow-sm hover:shadow-md transition-all rounded-xl">
+                <Card className="p-6 shadow-sm hover:shadow-md transition-all rounded-xl" style={{ backgroundColor: '#70864f', borderColor: '#70864f' }}>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-slate-500 mb-1">Total Revenue</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{formatCurrency(metrics.revenue)}</h3>
+                            <p className="text-sm font-medium text-white/80 mb-1">Total Revenue</p>
+                            <h3 className="text-2xl font-bold text-white">{formatCurrency(metrics.revenue)}</h3>
                             <PctBadge value={metrics.revenuePct} />
                         </div>
-                        <div className="p-3 bg-emerald-50 rounded-full text-emerald-600">
+                        <div className="p-3 bg-white/15 rounded-full text-white">
                             <CreditCard className="w-5 h-5" />
                         </div>
                     </div>
                 </Card>
 
-                <Card className="p-6 border-slate-200 shadow-sm hover:shadow-md transition-all rounded-xl">
+                <Card className="p-6 shadow-sm hover:shadow-md transition-all rounded-xl" style={{ backgroundColor: '#8b3f96', borderColor: '#8b3f96' }}>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-slate-500 mb-1">Total Orders</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{metrics.orders}</h3>
+                            <p className="text-sm font-medium text-white/80 mb-1">Total Orders</p>
+                            <h3 className="text-2xl font-bold text-white">{metrics.orders}</h3>
                             <PctBadge value={metrics.ordersPct} />
                         </div>
-                        <div className="p-3 bg-blue-50 rounded-full text-blue-600">
+                        <div className="p-3 bg-white/15 rounded-full text-white">
                             <ShoppingCart className="w-5 h-5" />
                         </div>
                     </div>
                 </Card>
 
-                <Card className="p-6 border-slate-200 shadow-sm hover:shadow-md transition-all rounded-xl">
+                <Card className="p-6 shadow-sm hover:shadow-md transition-all rounded-xl" style={{ backgroundColor: '#b15d24', borderColor: '#b15d24' }}>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-slate-500 mb-1">Active Products</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{metrics.products}</h3>
+                            <p className="text-sm font-medium text-white/80 mb-1">Active Products</p>
+                            <h3 className="text-2xl font-bold text-white">{metrics.products}</h3>
                         </div>
-                        <div className="p-3 bg-indigo-50 rounded-full text-indigo-600">
+                        <div className="p-3 bg-white/15 rounded-full text-white">
                             <Package className="w-5 h-5" />
                         </div>
                     </div>
                 </Card>
 
-                <Card className="p-6 border-slate-200 shadow-sm hover:shadow-md transition-all rounded-xl">
+                <Card className="p-6 shadow-sm hover:shadow-md transition-all rounded-xl" style={{ backgroundColor: '#9a3b83', borderColor: '#9a3b83' }}>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-slate-500 mb-1">Customers</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{metrics.customers}</h3>
+                            <p className="text-sm font-medium text-white/80 mb-1">Customers</p>
+                            <h3 className="text-2xl font-bold text-white">{metrics.customers}</h3>
                             <PctBadge value={metrics.customersPct} />
                         </div>
-                        <div className="p-3 bg-purple-50 rounded-full text-purple-600">
+                        <div className="p-3 bg-white/15 rounded-full text-white">
                             <Users className="w-5 h-5" />
                         </div>
                     </div>

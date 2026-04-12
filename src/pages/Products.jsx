@@ -5,7 +5,7 @@ import Card from '../components/Card'
 import {
     Search, ChevronLeft, ChevronRight, ChevronDown, Eye, ChevronUp, Pin, AlertTriangle,
     X, Check, Download, Trash2, Power, PowerOff, Upload, Plus, Star, ExternalLink,
-    Percent, Package, Loader2, CheckCircle2, RefreshCw, Sparkles as SparklesIcon, Crown
+    Percent, Package, Loader2, CheckCircle2, RefreshCw, Sparkles as SparklesIcon, Crown, Tag
 } from 'lucide-react'
 
 const Products = () => {
@@ -22,11 +22,20 @@ const Products = () => {
             return next
         })
         setCurrentPage(1)
+        setSelectedBrand(null)
+        setBrandSearch('')
     }
 
     // Suppliers list for toggle (from GET /api/admin/suppliers)
     const [suppliers, setSuppliers] = useState([])
     const [loadingSuppliers, setLoadingSuppliers] = useState(true)
+
+    // Brand filter state
+    const [brands, setBrands] = useState([])
+    const [selectedBrand, setSelectedBrand] = useState(null)
+    const [brandSearch, setBrandSearch] = useState('')
+    const [showBrandDropdown, setShowBrandDropdown] = useState(false)
+    const brandDropdownRef = useRef(null)
 
     // Product types state
     const [productTypes, setProductTypes] = useState([])
@@ -96,6 +105,9 @@ const Products = () => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setShowActionDropdown(false)
+            }
+            if (brandDropdownRef.current && !brandDropdownRef.current.contains(event.target)) {
+                setShowBrandDropdown(false)
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
@@ -208,6 +220,22 @@ const Products = () => {
         load()
     }, [])
 
+    // Fetch brands
+    useEffect(() => {
+        const loadBrands = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/filters/brands?limit=200`)
+                if (!res.ok) return
+                const data = await res.json()
+                const sorted = (data.brands || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                setBrands(sorted)
+            } catch (err) {
+                console.error('Error fetching brands:', err)
+            }
+        }
+        loadBrands()
+    }, [])
+
     // Fetch product types (scoped by supplier when selected)
     // GET /api/filters/product-types — no supplier = all types; ?supplier=slug = types for that supplier only
     useEffect(() => {
@@ -220,7 +248,8 @@ const Products = () => {
                 if (!response.ok) throw new Error('Failed to fetch product types')
                 const data = await response.json()
                 const types = data.product_types || data.productTypes || data || []
-                setProductTypes(types)
+                const sortedTypes = [...types].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                setProductTypes(sortedTypes)
 
                 setSelectedType((prev) => {
                     if (types.length === 0) return null
@@ -339,6 +368,10 @@ const Products = () => {
                 params.set('supplier', selectedSupplierSlug)
             }
 
+            if (selectedBrand) {
+                params.set('brand', selectedBrand.slug)
+            }
+
             params.append('page', currentPage.toString())
             params.append('limit', itemsPerPage.toString())
             params.append('_t', Date.now().toString())
@@ -381,7 +414,7 @@ const Products = () => {
                 setLoadingProducts(false)
             }
         }
-    }, [selectedType, selectedSupplierSlug, debouncedSearchTerm, currentPage, itemsPerPage, viewType])
+    }, [selectedType, selectedSupplierSlug, debouncedSearchTerm, currentPage, itemsPerPage, viewType, selectedBrand])
 
     useEffect(() => {
         fetchProducts()
@@ -1222,6 +1255,65 @@ const Products = () => {
                             />
                         </div>
 
+                        {/* Brand Filter Dropdown */}
+                        <div className="relative" ref={brandDropdownRef}>
+                            <button
+                                onClick={() => { setShowBrandDropdown(!showBrandDropdown); setBrandSearch('') }}
+                                className={`h-[42px] flex items-center gap-2 px-4 rounded-xl border text-[13px] font-bold transition-all whitespace-nowrap
+                                    ${selectedBrand
+                                        ? 'bg-primary text-white border-primary shadow-md'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40'
+                                    }`}
+                            >
+                                <Tag className="w-4 h-4" />
+                                <span>{selectedBrand ? selectedBrand.name : 'All Brands'}</span>
+                                {selectedBrand
+                                    ? <X className="w-3.5 h-3.5 ml-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedBrand(null); setBrandSearch('') }} />
+                                    : <ChevronDown className={`w-3.5 h-3.5 ml-1 transition-transform ${showBrandDropdown ? 'rotate-180' : ''}`} />
+                                }
+                            </button>
+
+                            {showBrandDropdown && (
+                                <div className="absolute left-0 top-full mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+                                    <div className="p-2 border-b border-slate-100">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                placeholder="Search brands..."
+                                                value={brandSearch}
+                                                onChange={e => setBrandSearch(e.target.value)}
+                                                className="w-full pl-8 pr-3 py-1.5 text-[12px] font-medium bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-primary"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto py-1">
+                                        <button
+                                            onClick={() => { setSelectedBrand(null); setShowBrandDropdown(false); setBrandSearch('') }}
+                                            className={`w-full text-left px-4 py-2 text-[12px] font-semibold transition-colors ${!selectedBrand ? 'text-primary bg-primary/5' : 'text-slate-600 hover:bg-slate-50'}`}
+                                        >
+                                            All Brands <span className="text-slate-400 font-normal">({brands.length})</span>
+                                        </button>
+                                        {brands
+                                            .filter(b => b.name.toLowerCase().includes(brandSearch.toLowerCase()))
+                                            .map(b => (
+                                                <button
+                                                    key={b.id}
+                                                    onClick={() => { setSelectedBrand(b); setShowBrandDropdown(false); setBrandSearch(''); setCurrentPage(1) }}
+                                                    className={`w-full text-left px-4 py-2 text-[12px] font-medium transition-colors flex items-center justify-between
+                                                        ${selectedBrand?.id === b.id ? 'text-primary bg-primary/5 font-bold' : 'text-slate-700 hover:bg-slate-50'}`}
+                                                >
+                                                    <span>{b.name}</span>
+                                                    <span className="text-slate-400 text-[11px]">{b.product_count}</span>
+                                                </button>
+                                            ))
+                                        }
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="flex items-center gap-2">
                             <button className="h-[42px] px-6 bg-slate-900 text-white text-[11px] font-black uppercase rounded-xl hover:bg-slate-800 transition-all tracking-widest shadow-lg shadow-slate-200 active:scale-95">
                                 Search
@@ -1371,21 +1463,24 @@ const Products = () => {
                                         <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Product Name</th>
                                         <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Brand</th>
                                         <th className="py-3 px-4 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Supplier</th>
+                                        <th className="py-3 px-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Carton Price</th>
                                         <th className="py-3 px-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sell Price</th>
+                                        <th className="py-3 px-4 text-right text-[11px] font-bold text-orange-400 uppercase tracking-wider">Profit/pc</th>
+                                        <th className="py-3 px-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Margin</th>
                                         <th className="py-3 px-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loadingProducts ? (
                                         <tr>
-                                            <td colSpan={8} className="py-12 text-center">
+                                            <td colSpan={11} className="py-12 text-center">
                                                 <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary-600" />
                                                 <p className="text-[#839ab1] mt-3 text-sm font-medium">Loading catalog...</p>
                                             </td>
                                         </tr>
                                     ) : products.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="py-12 text-center">
+                                            <td colSpan={11} className="py-12 text-center">
                                                 <p className="text-lg font-bold text-gray-900">No products found</p>
                                                 <p className="text-[#839ab1] text-sm">Try adjusting your filters or search terms.</p>
                                             </td>
@@ -1563,11 +1658,50 @@ const Products = () => {
                                                         })()}
                                                     </td>
 
-                                                    {/* Price */}
+                                                    {/* Carton Price */}
+                                                    <td className="py-3 px-4 text-right">
+                                                        <span className="text-sm font-medium text-slate-500">
+                                                            {product.carton_price != null ? `£${Number(product.carton_price).toFixed(2)}` : <span className="text-slate-300">—</span>}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Sell Price */}
                                                     <td className="py-3 px-4 text-right">
                                                         <span className="text-sm font-semibold text-gray-900">
                                                             £{Number(product.sell_price || product.price || 0).toFixed(2)}
                                                         </span>
+                                                    </td>
+
+                                                    {/* Profit per piece */}
+                                                    <td className="py-3 px-4 text-right">
+                                                        {(() => {
+                                                            const sell = Number(product.sell_price || product.price || 0);
+                                                            const cost = Number(product.carton_price || 0);
+                                                            if (!cost || !sell) return <span className="text-slate-300 text-xs">—</span>;
+                                                            return (
+                                                                <span className="text-sm font-bold text-orange-500">
+                                                                    £{(sell - cost).toFixed(2)}
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </td>
+
+                                                    {/* Margin */}
+                                                    <td className="py-3 px-4 text-right">
+                                                        {(() => {
+                                                            const sell = Number(product.sell_price || product.price || 0);
+                                                            const cost = Number(product.carton_price || 0);
+                                                            if (!cost || !sell) return <span className="text-slate-300 text-xs">—</span>;
+                                                            const profit = sell - cost;
+                                                            const margin = (profit / sell) * 100;
+                                                            const color = margin >= 30 ? 'text-emerald-600' : margin >= 15 ? 'text-amber-500' : 'text-red-500';
+                                                            return (
+                                                                <div className="flex flex-col items-end">
+                                                                    <span className={`text-sm font-semibold ${color}`}>£{profit.toFixed(2)}</span>
+                                                                    <span className={`text-[10px] font-medium ${color}`}>{margin.toFixed(1)}%</span>
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </td>
 
                                                     {/* Actions */}

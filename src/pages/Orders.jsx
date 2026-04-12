@@ -46,6 +46,8 @@ const Orders = () => {
     const [sortOrder, setSortOrder] = useState('desc')
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(null)
     const [deletingOrder, setDeletingOrder] = useState(null)
+    const [selectedOrders, setSelectedOrders] = useState(new Set())
+    const [bulkDeleting, setBulkDeleting] = useState(false)
     const requestedOpenOrderId = searchParams.get('open')
 
     useEffect(() => {
@@ -300,6 +302,48 @@ const Orders = () => {
         }
     }
 
+    const toggleSelectOrder = (orderId) => {
+        setSelectedOrders(prev => {
+            const next = new Set(prev)
+            if (next.has(orderId)) next.delete(orderId)
+            else next.add(orderId)
+            return next
+        })
+    }
+
+    const toggleSelectAll = () => {
+        if (selectedOrders.size === sortedOrders.length) {
+            setSelectedOrders(new Set())
+        } else {
+            setSelectedOrders(new Set(sortedOrders.map(o => o.id)))
+        }
+    }
+
+    const handleBulkDelete = async () => {
+        const count = selectedOrders.size
+        if (count === 0) return
+        const confirmed = window.confirm(`Delete ${count} selected order${count > 1 ? 's' : ''}? This cannot be undone.`)
+        if (!confirmed) return
+
+        setBulkDeleting(true)
+        const failed = []
+        for (const id of selectedOrders) {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/quotes/${id}`, { method: 'DELETE' })
+                if (!response.ok) failed.push(id)
+            } catch {
+                failed.push(id)
+            }
+        }
+
+        setOrders(prev => prev.filter(o => !selectedOrders.has(o.id) || failed.includes(o.id)))
+        if (selectedOrders.has(expandedOrder) && !failed.includes(expandedOrder)) setExpandedOrder(null)
+        setSelectedOrders(new Set(failed))
+        setBulkDeleting(false)
+
+        if (failed.length > 0) alert(`${failed.length} order(s) failed to delete.`)
+    }
+
     const handleDeleteOrder = async (order) => {
         const confirmed = window.confirm(`Delete quote ${order.quote_id} for ${order.customer_name || 'this customer'}?`)
         if (!confirmed) return
@@ -437,8 +481,31 @@ const Orders = () => {
 
             {/* Filters & Search Row */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <div className="relative flex-1 flex items-center gap-3">
+                    {/* Select All Checkbox */}
+                    {sortedOrders.length > 0 && (
+                        <button
+                            onClick={toggleSelectAll}
+                            className={`w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all
+                                ${selectedOrders.size === sortedOrders.length && sortedOrders.length > 0
+                                    ? 'bg-primary border-primary text-white'
+                                    : selectedOrders.size > 0
+                                        ? 'bg-primary/10 border-primary text-primary'
+                                        : 'bg-white border-slate-300 text-transparent hover:border-primary/50'
+                                }`}
+                            title={selectedOrders.size === sortedOrders.length ? 'Deselect all' : 'Select all'}
+                        >
+                            {selectedOrders.size === sortedOrders.length && sortedOrders.length > 0 ? (
+                                <CheckCircle className="w-5 h-5" />
+                            ) : selectedOrders.size > 0 ? (
+                                <div className="w-3 h-0.5 bg-primary rounded-full" />
+                            ) : (
+                                <div className="w-5 h-5" />
+                            )}
+                        </button>
+                    )}
+                    <div className="relative flex-1">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search by ID, Name or Email..."
@@ -446,6 +513,7 @@ const Orders = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-6">
@@ -529,6 +597,32 @@ const Orders = () => {
                 </div>
             </div>
 
+            {/* Bulk Action Bar */}
+            {selectedOrders.size > 0 && (
+                <div className="flex items-center justify-between bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-lg animate-in slide-in-from-bottom-2">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center font-black text-lg">{selectedOrders.size}</div>
+                        <span className="text-sm font-bold">{selectedOrders.size === 1 ? '1 order selected' : `${selectedOrders.size} orders selected`}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setSelectedOrders(new Set())}
+                            className="px-4 py-2 text-xs font-bold rounded-lg bg-white/10 hover:bg-white/20 transition-all"
+                        >
+                            Deselect All
+                        </button>
+                        <button
+                            onClick={handleBulkDelete}
+                            disabled={bulkDeleting}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-rose-500 hover:bg-rose-600 rounded-lg text-xs font-bold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            {bulkDeleting ? 'Deleting...' : `Delete ${selectedOrders.size === 1 ? 'Order' : `${selectedOrders.size} Orders`}`}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Orders List */}
             <div className="space-y-4">
                 {sortedOrders.length === 0 ? (
@@ -561,6 +655,19 @@ const Orders = () => {
                                     onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
                                 >
                                     <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+
+                                        {/* Checkbox */}
+                                        <button
+                                            data-html2canvas-ignore="true"
+                                            onClick={(e) => { e.stopPropagation(); toggleSelectOrder(order.id) }}
+                                            className={`w-7 h-7 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all
+                                                ${selectedOrders.has(order.id)
+                                                    ? 'bg-primary border-primary text-white'
+                                                    : 'bg-white border-slate-300 text-transparent hover:border-primary/50'
+                                                }`}
+                                        >
+                                            {selectedOrders.has(order.id) && <CheckCircle className="w-4 h-4" />}
+                                        </button>
 
                                         {/* Status Badge */}
                                         <div className="flex items-center justify-between lg:w-48 shrink-0">
@@ -919,7 +1026,7 @@ const Orders = () => {
                                                         <div className="space-y-4">
                                                             {/* Garment Cost */}
                                                             {summary.garmentCost > 0 && (
-                                                                <div className="bg-[#ea9d49] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                                                                <div className="bg-[#903d98] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                                                                     <div>
                                                                         <div className="font-bold text-lg mb-1.5 flex items-center gap-2">
                                                                             Garment Cost <span className="text-[10px] font-black opacity-90 uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded-full">ex vat</span>
@@ -934,8 +1041,10 @@ const Orders = () => {
                                                             )}
 
                                                             {/* Customizations Iteration */}
-                                                            {customizations.map((cust, idx) => (
-                                                                <div key={`cost-cust-${idx}`} className="bg-[#e6bb3b] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                                                            {customizations.map((cust, idx) => {
+                                                                const custColors = ['#8b3f96', '#70864f']
+                                                                return (
+                                                                <div key={`cost-cust-${idx}`} style={{ backgroundColor: custColors[idx % custColors.length] }} className="p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                                                                     <div>
                                                                         <div className="font-bold text-lg mb-1.5 flex items-center gap-2">
                                                                             {cust.position ? `${cust.position} ${cust.method}` : cust.method}
@@ -947,11 +1056,12 @@ const Orders = () => {
                                                                     </div>
                                                                     <div className="text-2xl font-black tracking-tight">£{cust.lineTotal?.toFixed(2)}</div>
                                                                 </div>
-                                                            ))}
+                                                                )
+                                                            })}
                                                             
                                                             {/* Digitizing Fee (if any) */}
                                                             {summary.digitizingFee > 0 && (
-                                                                <div className="bg-[#5cc0a1] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                                                                <div className="bg-[#b15d24] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                                                                     <div>
                                                                         <div className="font-bold text-lg mb-1.5 flex items-center gap-2">
                                                                             Digitisation / Setup Fee
@@ -963,7 +1073,7 @@ const Orders = () => {
                                                             )}
 
                                                             {/* Total Cost Block */}
-                                                            <div className="bg-[#e7aebb] p-5 lg:p-6 rounded-2xl text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md mt-6">
+                                                            <div className="bg-[#9a3b83] p-5 lg:p-6 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md mt-6">
                                                                 <div className="font-black text-xl flex items-center gap-2">
                                                                     Total Cost
                                                                 </div>
