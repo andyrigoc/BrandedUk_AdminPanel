@@ -359,10 +359,11 @@ const Products = () => {
             if (debouncedSearchTerm) {
                 params.append('q', debouncedSearchTerm)
                 params.append('sort', 'newest')
-            } else {
-                // Only scope by productType when NOT searching
+            } else if (selectedType?.slug) {
+                // Only scope by productType when NOT searching and a type is selected
                 params.append('productType', selectedType.slug)
             }
+            // If selectedType is null (All Products) or brand filter is active → no productType param → returns all
 
             if (selectedSupplierSlug) {
                 params.set('supplier', selectedSupplierSlug)
@@ -1162,6 +1163,22 @@ const Products = () => {
                         </button>
                     </div>
                     <div className="space-y-0.5 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                        {/* All Products */}
+                        <button
+                            onClick={() => { setSelectedType(null); setCurrentPage(1) }}
+                            className={`w-full flex items-center justify-between px-4 py-2 text-[13px] rounded transition-all ${!selectedType
+                                ? 'bg-primary text-white font-bold'
+                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                                }`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`w-1.5 h-1.5 rounded-full ${!selectedType ? 'bg-white' : 'bg-slate-300'}`} />
+                                <span>All Products</span>
+                            </div>
+                            <span className={!selectedType ? 'text-white/80' : 'text-slate-400'}>
+                                ({totalCount.toLocaleString()})
+                            </span>
+                        </button>
                         {productTypes.map(type => (
                             <button
                                 key={type.id}
@@ -1300,12 +1317,11 @@ const Products = () => {
                                             .map(b => (
                                                 <button
                                                     key={b.id}
-                                                    onClick={() => { setSelectedBrand(b); setShowBrandDropdown(false); setBrandSearch(''); setCurrentPage(1) }}
+                                                    onClick={() => { setSelectedBrand(b); setShowBrandDropdown(false); setBrandSearch(''); setCurrentPage(1); setSelectedType(null) }}
                                                     className={`w-full text-left px-4 py-2 text-[12px] font-medium transition-colors flex items-center justify-between
                                                         ${selectedBrand?.id === b.id ? 'text-primary bg-primary/5 font-bold' : 'text-slate-700 hover:bg-slate-50'}`}
                                                 >
                                                     <span>{b.name}</span>
-                                                    <span className="text-slate-400 text-[11px]">{b.product_count}</span>
                                                 </button>
                                             ))
                                         }
@@ -1315,7 +1331,9 @@ const Products = () => {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <button className="h-[42px] px-6 bg-slate-900 text-white text-[11px] font-black uppercase rounded-xl hover:bg-slate-800 transition-all tracking-widest shadow-lg shadow-slate-200 active:scale-95">
+                            <button
+                                onClick={() => { setDebouncedSearchTerm(searchTerm); fetchProducts() }}
+                                className="h-[42px] px-6 bg-slate-900 text-white text-[11px] font-black uppercase rounded-xl hover:bg-slate-800 transition-all tracking-widest shadow-lg shadow-slate-200 active:scale-95">
                                 Search
                             </button>
                         </div>
@@ -1500,7 +1518,7 @@ const Products = () => {
                                                         navigate(`/products/${code}`);
                                                     }}
                                                     className={`border-b border-gray-50 transition-colors cursor-pointer
-                                                    ${selected ? 'bg-primary/5' : isPinned ? 'bg-[#FFFBEB]' : 'hover:bg-gray-50'}`}
+                                                    ${selected ? 'bg-primary/5' : isPinned ? 'bg-slate-50' : 'hover:bg-gray-50'}`}
                                                 >
                                                     {/* Checkbox */}
                                                     <td className="py-4 px-6">

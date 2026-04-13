@@ -1026,7 +1026,7 @@ const Orders = () => {
                                                         <div className="space-y-4">
                                                             {/* Garment Cost */}
                                                             {summary.garmentCost > 0 && (
-                                                                <div className="bg-[#903d98] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                                                                <div className="bg-[#f97316] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                                                                     <div>
                                                                         <div className="font-bold text-lg mb-1.5 flex items-center gap-2">
                                                                             Garment Cost <span className="text-[10px] font-black opacity-90 uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded-full">ex vat</span>
@@ -1073,7 +1073,7 @@ const Orders = () => {
                                                             )}
 
                                                             {/* Total Cost Block */}
-                                                            <div className="bg-[#9a3b83] p-5 lg:p-6 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md mt-6">
+                                                            <div className="bg-[#cda42c] p-5 lg:p-6 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md mt-6">
                                                                 <div className="font-black text-xl flex items-center gap-2">
                                                                     Total Cost
                                                                 </div>
