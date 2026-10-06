@@ -12,8 +12,8 @@ import {
 } from 'lucide-react'
 import { API_BASE } from '../config'
 
-const PRODUCT_TYPES_API = `${API_BASE}/api/filters/product-types`
 const TEMPLATE_API = `${API_BASE}/api/admin/customization/templates`
+const PRODUCT_TYPES_API = TEMPLATE_API
 const IMAGE_UPLOAD_API = `${API_BASE}/api/admin/customization-config/upload-image`
 
 const GENERIC_SUBTYPE = { key: '', label: 'Generic fallback' }
@@ -21,27 +21,54 @@ const CUSTOMIZATION_SUBTYPES = {
     aprons: [{ key: 'bib', label: 'Bib apron' }, { key: 'waist', label: 'Waist apron' }],
     bags: [
         { key: 'tote', label: 'Tote / shopper' },
+        { key: 'drawstring-gymsac', label: 'Drawstring / gymsac' },
+        { key: 'book-bag', label: 'Book bag' },
         { key: 'backpack', label: 'Backpack / rucksack' },
+        { key: 'messenger', label: 'Messenger bag' },
         { key: 'holdall', label: 'Holdall / duffel' },
+        { key: 'boot-bag', label: 'Boot bag' },
         { key: 'laptop-document', label: 'Laptop / document bag' }
     ],
     beanies: [{ key: 'cuffed', label: 'Cuffed beanie' }, { key: 'bobble', label: 'Bobble beanie' }],
+    bibs: [{ key: 'baby-bib', label: 'Baby bib' }],
+    blankets: [{ key: 'blanket', label: 'Blanket' }],
+    blouses: [{ key: 'blouse', label: 'Blouse' }],
+    bodysuits: [{ key: 'baby-bodysuit', label: 'Baby bodysuit' }],
+    caps: [{ key: 'baseball', label: 'Baseball cap' }, { key: 'trucker', label: 'Trucker cap' }],
+    'chef-jackets': [{ key: 'chef-jacket', label: 'Chef jacket' }],
+    coveralls: [{ key: 'coverall-overall', label: 'Coverall / overall' }],
+    'dog-hoodies': [{ key: 'dog-hoodie', label: 'Dog hoodie' }],
+    'dog-jackets': [{ key: 'dog-jacket', label: 'Dog jacket' }],
+    'dog-t-shirts': [{ key: 'dog-tshirt', label: 'Dog T-shirt' }],
+    dungarees: [{ key: 'bib-brace', label: 'Bib and brace' }],
     fleece: [{ key: 'full-zip', label: 'Full zip fleece' }, { key: 'quarter-zip', label: 'Quarter zip fleece' }],
-    'gilets-body-warmers': [{ key: 'padded', label: 'Padded gilet' }, { key: 'fleece', label: 'Fleece gilet' }],
-    hats: [{ key: 'bucket', label: 'Bucket hat' }, { key: 'wide-brim', label: 'Wide-brim hat' }],
-    'safety-vests': [{ key: 'waistcoat', label: 'Hi-vis waistcoat' }, { key: 'jacket-bomber', label: 'Hi-vis jacket / bomber' }],
-    hoodies: [{ key: 'pullover', label: 'Pullover hoodie' }, { key: 'full-zip', label: 'Full zip hoodie' }],
+    'gilets-body-warmers': [{ key: 'standard', label: 'Standard gilet' }, { key: 'padded', label: 'Padded gilet' }, { key: 'hi-vis-bodywarmer', label: 'Hi-vis bodywarmer' }],
+    hats: [{ key: 'bucket', label: 'Bucket hat' }],
+    'laptop-cases': [{ key: 'laptop-sleeve', label: 'Laptop sleeve' }],
+    'safety-vests': [{ key: 'waistcoat', label: 'Hi-vis waistcoat' }],
+    hoodies: [{ key: 'pullover', label: 'Pullover hoodie' }, { key: 'full-zip', label: 'Full zip hoodie' }, { key: 'hi-vis-hoodie', label: 'Hi-vis hoodie' }],
     jackets: [
-        { key: 'lightweight', label: 'Lightweight jacket' },
+        { key: 'workwear', label: 'Workwear jacket' },
+        { key: 'bomber', label: 'Bomber jacket' },
         { key: 'padded-puffer', label: 'Padded / puffer jacket' },
-        { key: 'waterproof-parka', label: 'Waterproof / parka' }
+        { key: 'waterproof-parka', label: 'Waterproof / parka' },
+        { key: 'hi-vis-jacket', label: 'Hi-vis jacket' }
     ],
-    polos: [{ key: 'short-sleeve', label: 'Short-sleeve polo' }, { key: 'long-sleeve', label: 'Long-sleeve polo' }],
+    polos: [{ key: 'short-sleeve', label: 'Short-sleeve polo' }, { key: 'long-sleeve', label: 'Long-sleeve polo' }, { key: 'hi-vis-polo', label: 'Hi-vis polo' }],
+    'rugby-shirts': [{ key: 'rugby-shirt', label: 'Rugby shirt' }],
     shirts: [{ key: 'short-sleeve', label: 'Short-sleeve shirt' }, { key: 'long-sleeve', label: 'Long-sleeve shirt' }],
-    shorts: [{ key: 'sports', label: 'Sports shorts' }, { key: 'cargo-workwear', label: 'Cargo / workwear shorts' }],
-    sweatshirts: [{ key: 'crewneck', label: 'Crewneck sweatshirt' }, { key: 'quarter-zip', label: 'Quarter zip sweatshirt' }],
-    tshirts: [{ key: 'short-sleeve', label: 'Short-sleeve T-shirt' }, { key: 'long-sleeve', label: 'Long-sleeve T-shirt' }],
-    'vests-t-shirt': [{ key: 'standard', label: 'Standard vest' }, { key: 'racerback', label: 'Racerback vest' }]
+    shorts: [{ key: 'shorts', label: 'Shorts' }],
+    softshells: [{ key: 'softshell-jacket', label: 'Softshell jacket' }],
+    'sports-overtops': [{ key: 'sports-jersey', label: 'Sports jersey' }],
+    sweatpants: [{ key: 'joggers', label: 'Joggers' }],
+    sweatshirts: [{ key: 'crewneck', label: 'Crewneck sweatshirt' }, { key: 'quarter-zip', label: 'Quarter zip sweatshirt' }, { key: 'hi-vis-sweatshirt', label: 'Hi-vis sweatshirt' }],
+    tabards: [{ key: 'tabard', label: 'Tabard' }],
+    towels: [{ key: 'towel', label: 'Towel' }],
+    trousers: [{ key: 'work-trousers', label: 'Work trousers' }],
+    tshirts: [{ key: 'short-sleeve', label: 'Short-sleeve T-shirt' }, { key: 'long-sleeve', label: 'Long-sleeve T-shirt' }, { key: 'hi-vis-tshirt', label: 'Hi-vis T-shirt' }, { key: 'baby-toddler', label: 'Baby / toddler T-shirt' }],
+    tunics: [{ key: 'tunic-scrub-top', label: 'Tunic / scrub top' }],
+    umbrellas: [{ key: 'umbrella', label: 'Umbrella' }],
+    'vests-t-shirt': [{ key: 'sports-vest', label: 'Sports vest / tank top' }]
 }
 
 const methodPriceValue = (value) => value === null || value === undefined ? '' : String(value)
@@ -62,13 +89,21 @@ const resolveImageUrl = (value) => {
 }
 
 const normalizeProductTypes = (data) => {
-    const list = data?.product_types || data?.productTypes || data?.items || data || []
+    const list = data?.data?.items || data?.product_types || data?.productTypes || data?.items || data || []
     if (!Array.isArray(list)) return []
 
     return list.map((item, index) => ({
         id: item.id ?? item.slug ?? item.code ?? index,
         name: item.name || item.label || item.product_type || item.slug || `Type ${index + 1}`,
-        slug: String(item.slug || item.code || slugify(item.name || item.label || item.product_type))
+        slug: String(item.slug || item.code || slugify(item.name || item.label || item.product_type)),
+        subtypes: Array.isArray(item.subtypes)
+            ? item.subtypes.map(subtype => ({
+                key: String(subtype.key || ''),
+                label: String(subtype.label || subtype.key || '')
+                    .replace(/-/g, ' ')
+                    .replace(/\b\w/g, letter => letter.toUpperCase())
+            })).filter(subtype => subtype.key)
+            : []
     })).filter(item => item.slug)
 }
 
@@ -206,8 +241,10 @@ const CustomizationConfig = () => {
         [productTypes, selectedTypeSlug]
     )
     const selectedSubtypeOptions = useMemo(
-        () => CUSTOMIZATION_SUBTYPES[selectedTypeSlug] || [],
-        [selectedTypeSlug]
+        () => selectedType?.subtypes?.length
+            ? selectedType.subtypes
+            : (CUSTOMIZATION_SUBTYPES[selectedTypeSlug] || []),
+        [selectedType, selectedTypeSlug]
     )
     const activeSubtypeKey = selectedSubtypeOptions.length > 0 ? selectedSubtypeKey : ''
 
