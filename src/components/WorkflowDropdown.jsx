@@ -12,6 +12,7 @@ export const WORKFLOW_STATUSES = [
     { key: 'Ready to Collect', label: 'Ready to Collect', bg: '#1e3a8a', text: '#ffffff', border: '#1e40af' },
     { key: 'Delivered', label: 'Delivered', bg: '#7c3aed', text: '#ffffff', border: '#6d28d9' },
     { key: 'Paid', label: 'Paid', bg: '#db2777', text: '#ffffff', border: '#be185d' },
+    { key: 'Quote Sent', label: 'Quote Sent', bg: '#0f766e', text: '#ffffff', border: '#0d9488' },
 ]
 
 export const getStatusStyle = (statusKey) => {

@@ -4,13 +4,14 @@ import { API_BASE } from '../config'
 import Card from '../components/Card'
 import {
     Search, ChevronLeft, ChevronRight, ChevronDown, Eye, ChevronUp, Pin, AlertTriangle,
-    X, Check, Download, Trash2, Power, PowerOff, Upload, Plus, Star, ExternalLink,
-    Percent, Package, Loader2, CheckCircle2, RefreshCw, Sparkles as SparklesIcon, Crown, Tag
+    X, Check, Download, Trash2, Power, PowerOff, Upload, Star, ExternalLink,
+    Percent, Package, Loader2, CheckCircle2, RefreshCw, Sparkles as SparklesIcon, Crown, Tag, Store
 } from 'lucide-react'
 
 const Products = () => {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
+    const selectedSiteSlug = searchParams.get('site') || ''
 
     // Supplier: persisted in URL (?supplier=slug), slug used for API
     const selectedSupplierSlug = searchParams.get('supplier') || ''
@@ -24,6 +25,16 @@ const Products = () => {
         setCurrentPage(1)
         setSelectedBrand(null)
         setBrandSearch('')
+    }
+
+    const setSiteFilter = (slug) => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev)
+            if (slug) next.set('site', slug)
+            else next.delete('site')
+            return next
+        })
+        setCurrentPage(1)
     }
 
     // Suppliers list for toggle (from GET /api/admin/suppliers)
@@ -44,6 +55,8 @@ const Products = () => {
 
     // Products state
     const [products, setProducts] = useState([])
+    const [humanitieesItems, setHumanitieesItems] = useState([])
+    const [humanitieesCodes, setHumanitieesCodes] = useState(new Set())
     const [loadingProducts, setLoadingProducts] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
@@ -202,6 +215,27 @@ const Products = () => {
     const [productStyles, setProductStyles] = useState([])
     const [selectedStyle, setSelectedStyle] = useState(null)
 
+    const fetchHumanitieesAssignments = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/sites/humanitiees/products?active=true&_t=${Date.now()}`, {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache' }
+            })
+            if (!response.ok) throw new Error('Failed to fetch Humanitiees assignments')
+
+            const data = await response.json()
+            const items = Array.isArray(data) ? data : (data.items || data.products || data.rows || [])
+            setHumanitieesItems(items)
+            setHumanitieesCodes(new Set(items.map(item => item.style_code || item.code || item.styleCode).filter(Boolean)))
+        } catch (err) {
+            console.error('Error fetching Humanitiees assignments:', err)
+        }
+    }, [])
+
+    useEffect(() => {
+        fetchHumanitieesAssignments()
+    }, [fetchHumanitieesAssignments])
+
     // Fetch suppliers for toggle (GET /api/admin/suppliers)
     useEffect(() => {
         const load = async () => {
@@ -336,8 +370,6 @@ const Products = () => {
 
     // Fetch products — with AbortController to prevent race conditions
     const fetchProducts = useCallback(async () => {
-        if (!selectedType) return
-
         // Cancel any in-flight request before starting a new one
         if (abortControllerRef.current) {
             abortControllerRef.current.abort()
@@ -352,6 +384,57 @@ const Products = () => {
             setLoadingProducts(true)
             // Clear old products immediately to prevent showing stale data
             setProducts([])
+
+            if (selectedSiteSlug === 'humanitiees' && viewType !== 'deactivated') {
+                const response = await fetch(`${API_BASE}/api/admin/sites/humanitiees/products?active=true&_t=${Date.now()}`, {
+                    cache: 'no-store',
+                    headers: { 'Cache-Control': 'no-cache' },
+                    signal: controller.signal
+                })
+
+                if (thisFetchId !== fetchIdRef.current) return
+                if (!response.ok) throw new Error('Failed to fetch Humanitiees products')
+
+                const data = await response.json()
+                const allItems = Array.isArray(data) ? data : (data.items || data.products || data.rows || [])
+                const query = debouncedSearchTerm.trim().toLowerCase()
+
+                const filteredItems = allItems.filter((product) => {
+                    const code = String(product.code || product.style_code || '').toLowerCase()
+                    const name = String(product.name || product.style_name || '').toLowerCase()
+                    const description = String(product.description || '').toLowerCase()
+                    const brandName = String(product.brand || product.brand_name || '').toLowerCase()
+                    const brandSlug = String(product.brand_slug || product.brandSlug || '').toLowerCase()
+                    const supplierName = String(product.supplier || '').toLowerCase()
+                    const supplierSlug = String(product.supplier_slug || product.supplierSlug || '').toLowerCase()
+                    const typeId = product.product_type_id || product.productTypeId || product.type_id || product.typeId
+                    const typeSlug = String(product.product_type_slug || product.productTypeSlug || product.typeSlug || '').toLowerCase()
+                    const typeName = String(product.product_type_name || product.product_type || product.productType || '').toLowerCase()
+
+                    const matchesSearch = !query || code.includes(query) || name.includes(query) || description.includes(query) || brandName.includes(query)
+                    const matchesBrand = !selectedBrand || brandSlug === String(selectedBrand.slug || '').toLowerCase() || brandName === String(selectedBrand.name || '').toLowerCase()
+                    const matchesSupplier = !selectedSupplierSlug || supplierSlug === selectedSupplierSlug.toLowerCase() || supplierName.includes(selectedSupplierSlug.toLowerCase())
+                    const matchesType = !selectedType || (
+                        (typeId != null && String(typeId) === String(selectedType.id)) ||
+                        typeSlug === String(selectedType.slug || '').toLowerCase() ||
+                        typeName === String(selectedType.name || '').toLowerCase()
+                    )
+
+                    return matchesSearch
+
+                })
+
+                const totalItems = filteredItems.length
+                const startIndex = (currentPage - 1) * itemsPerPage
+                const pagedItems = filteredItems.slice(startIndex, startIndex + itemsPerPage)
+
+                if (thisFetchId !== fetchIdRef.current) return
+
+                setProducts(pagedItems)
+                setTotalCount(totalItems)
+                setTotalPages(Math.max(1, Math.ceil(totalItems / itemsPerPage)))
+                return
+            }
 
             const params = new URLSearchParams()
 
@@ -415,7 +498,7 @@ const Products = () => {
                 setLoadingProducts(false)
             }
         }
-    }, [selectedType, selectedSupplierSlug, debouncedSearchTerm, currentPage, itemsPerPage, viewType, selectedBrand])
+    }, [selectedType, selectedSupplierSlug, debouncedSearchTerm, currentPage, itemsPerPage, viewType, selectedBrand, selectedSiteSlug])
 
     useEffect(() => {
         fetchProducts()
@@ -1031,7 +1114,7 @@ const Products = () => {
         // we might want to handle that. But the current implementation uses selectedProducts.
         // Let's modify it to accept an optional single code.
         const codes = Array.from(selectedProducts.keys())
-        
+
         // If someone called handleBulkFeatured(null, null, true, 'GD001')
         const targetCodes = singleCode ? [singleCode] : codes;
 
@@ -1064,6 +1147,46 @@ const Products = () => {
 
             setTimeout(() => setSuccessMessage(null), 3000)
 
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setProcessing(false)
+        }
+    }
+
+    const handleBulkHumanitiees = async () => {
+        const codes = Array.from(selectedProducts.keys())
+        if (codes.length === 0) {
+            setError('Select at least one product first, then click Mark as Humanitiees.')
+            setTimeout(() => setError(null), 3000)
+            return
+        }
+
+        try {
+            setProcessing(true)
+            setError(null)
+
+            const response = await fetch(`${API_BASE}/api/admin/sites/humanitiees/products/bulk`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    style_codes: codes,
+                    active: true
+                })
+            })
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}))
+                throw new Error(data.message || 'Failed to mark products as Humanitiees')
+            }
+
+            setSuccessMessage(`${codes.length} product(s) marked for Humanitiees`)
+            setSelectedProducts(new Map())
+            setSelectedAction('')
+            await fetchHumanitieesAssignments()
+            await fetchProducts()
+
+            setTimeout(() => setSuccessMessage(null), 3000)
         } catch (err) {
             setError(err.message)
         } finally {
@@ -1131,23 +1254,85 @@ const Products = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => fetchProducts()}
-                        className="h-9 px-4 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-all flex items-center gap-2"
-                    >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Refresh
-                    </button>
-                    <div className="relative group">
-                        <button className="h-9 px-4 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-all flex items-center gap-2">
-                            <Download className="w-3.5 h-3.5" />
-                            Import
-                            <ChevronDown className="w-3.5 h-3.5" />
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleApplyAction}
+                            disabled={!selectedAction || processing || selectedProducts.size === 0 || (selectedAction === 'save-order' && validationErrors.size > 0)}
+                            className="h-9 px-5 bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest rounded hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+                            title={selectedProducts.size === 0 ? "Select products first" : ""}
+                        >
+                            {processing ? '...' : 'Apply'}
                         </button>
+
+                        {/* Custom Compact Dropdown */}
+                        <div className="relative" ref={dropdownRef}>
+                            <button
+                                onClick={() => setShowActionDropdown(!showActionDropdown)}
+                                className={`h-9 px-4 flex items-center gap-2 rounded text-xs font-bold transition-all border ${selectedAction
+                                    ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                    }`}
+                            >
+                                {selectedAction ? (
+                                    <>
+                                        {(() => {
+                                            const action = bulkActions.find(a => a.value === selectedAction);
+                                            const Icon = action?.icon || Check;
+                                            return <Icon className="w-3.5 h-3.5" />;
+                                        })()}
+                                        <span>{bulkActions.find(a => a.value === selectedAction)?.label}</span>
+                                        <X 
+                                            className="w-3.5 h-3.5 ml-1 cursor-pointer hover:text-white/80 transition-colors" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedAction('');
+                                            }} 
+                                        />
+                                    </>
+                                ) : (
+                                    <>
+                                        <Package className="w-3.5 h-3.5" />
+                                        <span>Actions</span>
+                                        <ChevronDown className={`w-3.5 h-3.5 ml-1 transition-transform duration-200 ${showActionDropdown ? 'rotate-180' : ''}`} />
+                                    </>
+                                )}
+                            </button>
+
+                            {showActionDropdown && (
+                                <div className="absolute right-0 top-full mt-1.5 w-60 bg-white rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-slate-100 z-[100] py-1.5 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                    {bulkActions.map((action) => {
+                                        const Icon = action.icon;
+                                        return (
+                                            <button
+                                                key={action.value}
+                                                onClick={() => {
+                                                    setSelectedAction(action.value);
+                                                    setShowActionDropdown(false);
+                                                }}
+                                                className={`w-full px-3 py-2 flex items-center gap-2.5 text-[12px] font-medium transition-colors ${selectedAction === action.value
+                                                    ? 'bg-primary/5 text-primary'
+                                                    : action.danger
+                                                        ? 'text-red-600 hover:bg-red-50'
+                                                        : 'text-slate-600 hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                <Icon className={`w-3.5 h-3.5 ${selectedAction === action.value ? 'text-primary' : action.danger ? 'text-red-500' : 'text-slate-400'}`} />
+                                                <span className="font-bold">{action.label}</span>
+                                                {selectedAction === action.value && <Check className="w-3 h-3 ml-auto" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <button className="h-9 px-4 text-xs font-bold text-white bg-[#1e293b] rounded hover:bg-slate-800 transition-all flex items-center gap-2">
-                        <Plus className="w-3.5 h-3.5" />
-                        Add Product
+                    <button
+                        onClick={handleBulkHumanitiees}
+                        className="h-9 px-4 text-xs font-bold text-white bg-[#1e293b] rounded hover:bg-slate-800 transition-all flex items-center gap-2"
+                    >
+                        <Store className="w-3.5 h-3.5" />
+                        {selectedProducts.size > 0 ? `Mark as Humanitiees (${selectedProducts.size})` : 'Mark as Humanitiees'}
                     </button>
                 </div>
             </div>
@@ -1245,7 +1430,10 @@ const Products = () => {
                                 Live Catalog
                             </button>
                             <button
-                                onClick={() => setViewType('deactivated')}
+                                onClick={() => {
+                                    setViewType('deactivated')
+                                    if (selectedSiteSlug) setSiteFilter('')
+                                }}
                                 className={`px-5 py-2 text-[13px] font-bold rounded-lg transition-all ${viewType === 'deactivated'
                                     ? 'bg-white text-primary shadow-sm'
                                     : 'text-slate-400 hover:text-slate-600'
@@ -1330,6 +1518,19 @@ const Products = () => {
                             )}
                         </div>
 
+                        {viewType === 'standard' && (
+                            <button
+                                onClick={() => setSiteFilter(selectedSiteSlug === 'humanitiees' ? '' : 'humanitiees')}
+                                className={`h-[42px] flex items-center gap-2 px-4 rounded-xl border text-[13px] font-bold transition-all whitespace-nowrap ${selectedSiteSlug === 'humanitiees'
+                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-100'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-700'
+                                    }`}
+                            >
+                                <Store className="w-4 h-4" />
+                                <span>{selectedSiteSlug === 'humanitiees' ? 'Humanitiees Only' : 'Filter Humanitiees'}</span>
+                            </button>
+                        )}
+
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => { setDebouncedSearchTerm(searchTerm); fetchProducts() }}
@@ -1338,6 +1539,27 @@ const Products = () => {
                             </button>
                         </div>
                     </div>
+
+                    {viewType === 'standard' && (
+                        <div className="mb-5 flex flex-wrap items-center gap-3">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500 shadow-sm">
+                                <Store className="w-3.5 h-3.5 text-emerald-600" />
+                                {humanitieesItems.length} Humanitiees Products
+                            </div>
+                            {selectedSiteSlug === 'humanitiees' && (
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                                    Showing Humanitiees subset in the main catalog
+                                    <button 
+                                        onClick={() => setSiteFilter('')}
+                                        className="hover:bg-emerald-200/50 rounded-full p-0.5 transition-colors flex items-center justify-center cursor-pointer"
+                                        title="Clear filter"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Compact Redesigned Bulk Actions Bar */}
                     {selectedProducts.size > 0 && (
@@ -1368,70 +1590,7 @@ const Products = () => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                {/* Custom Compact Dropdown */}
-                                <div className="relative" ref={dropdownRef}>
-                                    <button
-                                        onClick={() => setShowActionDropdown(!showActionDropdown)}
-                                        className={`h-8 px-4 flex items-center gap-2 rounded-md text-[11px] font-bold transition-all border ${selectedAction
-                                            ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20'
-                                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                                            }`}
-                                    >
-                                        {selectedAction ? (
-                                            <>
-                                                {(() => {
-                                                    const action = bulkActions.find(a => a.value === selectedAction);
-                                                    const Icon = action?.icon || Check;
-                                                    return <Icon className="w-3.5 h-3.5" />;
-                                                })()}
-                                                <span>{bulkActions.find(a => a.value === selectedAction)?.label}</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Package className="w-3.5 h-3.5" />
-                                                <span>Actions</span>
-                                            </>
-                                        )}
-                                        <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 ${showActionDropdown ? 'rotate-180' : ''}`} />
-                                    </button>
 
-                                    {showActionDropdown && (
-                                        <div className="absolute right-0 top-full mt-1.5 w-60 bg-white rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-slate-100 z-[100] py-1.5 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                                            {bulkActions.map((action) => {
-                                                const Icon = action.icon;
-                                                return (
-                                                    <button
-                                                        key={action.value}
-                                                        onClick={() => {
-                                                            setSelectedAction(action.value);
-                                                            setShowActionDropdown(false);
-                                                        }}
-                                                        className={`w-full px-3 py-2 flex items-center gap-2.5 text-[12px] font-medium transition-colors ${selectedAction === action.value
-                                                            ? 'bg-primary/5 text-primary'
-                                                            : action.danger
-                                                                ? 'text-red-600 hover:bg-red-50'
-                                                                : 'text-slate-600 hover:bg-slate-50'
-                                                            }`}
-                                                    >
-                                                        <Icon className={`w-3.5 h-3.5 ${selectedAction === action.value ? 'text-primary' : action.danger ? 'text-red-500' : 'text-slate-400'}`} />
-                                                        <span className="font-bold">{action.label}</span>
-                                                        {selectedAction === action.value && <Check className="w-3 h-3 ml-auto" />}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={handleApplyAction}
-                                    disabled={!selectedAction || processing || (selectedAction === 'save-order' && validationErrors.size > 0)}
-                                    className="h-8 px-5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-md hover:bg-slate-800 disabled:opacity-30 transition-all shadow-sm active:scale-95"
-                                >
-                                    {processing ? '...' : 'Apply'}
-                                </button>
-                            </div>
                         </div>
                     )}
 
@@ -1475,7 +1634,9 @@ const Products = () => {
                                                 checked={selectedProducts.size === products.length && products.length > 0}
                                             />
                                         </th>
-                                        <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Order</th>
+                                        {selectedSiteSlug !== 'humanitiees' && (
+                                            <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Order</th>
+                                        )}
                                         <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Image</th>
                                         <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Code</th>
                                         <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Product Name</th>
@@ -1509,6 +1670,7 @@ const Products = () => {
                                             const selected = isSelected(code)
                                             const displayOrder = getDisplayOrder(product)
                                             const isPinned = displayOrder != null
+                                            const isHumanitiees = humanitieesCodes.has(code)
 
                                             return (
                                                 <tr
@@ -1531,71 +1693,73 @@ const Products = () => {
                                                     </td>
 
                                                     {/* Order */}
-                                                    <td className="py-3 px-4">
-                                                        <div className="flex items-center justify-center gap-1.5 min-w-[100px]">
-                                                            {/* Up/Down Controls-Visible if Pinned or Selected */}
-                                                            {(selected || isPinned) && (
-                                                                <div className="flex flex-col gap-1">
-                                                                    <button
-                                                                        onClick={() => moveUp(product)}
-                                                                        disabled={displayOrder <= 1}
-                                                                        className="p-1.5 rounded-md text-slate-400 hover:text-primary hover:bg-primary/10 disabled:opacity-0 transition-all"
-                                                                        title="Move Up"
-                                                                    >
-                                                                        <ChevronUp className="w-4 h-4 stroke-[3]" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => moveDown(product)}
-                                                                        className="p-1.5 rounded-md text-slate-400 hover:text-primary hover:bg-primary/10 transition-all"
-                                                                        title="Move Down"
-                                                                    >
-                                                                        <ChevronDown className="w-4 h-4 stroke-[3]" />
-                                                                    </button>
-                                                                </div>
-                                                            )}
-
-                                                            <div className="flex items-center gap-1">
-                                                                {selected ? (
-                                                                    /* Editable Badge when row is selected */
-                                                                    <div className="relative group/badge">
-                                                                        <div className={`px-2 py-1 rounded-[6px] text-[12px] font-bold flex items-center gap-1 min-w-[50px] justify-center transition-all ${isPinned ? 'bg-[#F59E0B] text-white shadow-lg shadow-amber-200/50' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
-                                                                            <span className="text-[10px] opacity-70">★</span>
-                                                                            <input
-                                                                                type="number"
-                                                                                min="1"
-                                                                                value={displayOrder ?? ''}
-                                                                                onChange={(e) => handleOrderChange(product, e.target.value)}
-                                                                                onBlur={() => triggerConflictModal(product)}
-                                                                                className="w-8 bg-transparent text-center focus:outline-none border-none p-0 text-[12px] font-bold placeholder:text-current/30"
-                                                                                placeholder="—"
-                                                                            />
-                                                                        </div>
-                                                                        {isPinned && (
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    unpinProduct(product);
-                                                                                }}
-                                                                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-400 text-white flex items-center justify-center hover:bg-red-500 transition-colors shadow-sm"
-                                                                                title="Remove Pin"
-                                                                            >
-                                                                                <X className="w-3 h-3 stroke-[3]" />
-                                                                            </button>
-                                                                        )}
+                                                    {selectedSiteSlug !== 'humanitiees' && (
+                                                        <td className="py-3 px-4">
+                                                            <div className="flex items-center justify-center gap-1.5 min-w-[100px]">
+                                                                {/* Up/Down Controls-Visible if Pinned or Selected */}
+                                                                {(selected || isPinned) && (
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <button
+                                                                            onClick={() => moveUp(product)}
+                                                                            disabled={displayOrder <= 1}
+                                                                            className="p-1.5 rounded-md text-slate-400 hover:text-primary hover:bg-primary/10 disabled:opacity-0 transition-all"
+                                                                            title="Move Up"
+                                                                        >
+                                                                            <ChevronUp className="w-4 h-4 stroke-[3]" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => moveDown(product)}
+                                                                            className="p-1.5 rounded-md text-slate-400 hover:text-primary hover:bg-primary/10 transition-all"
+                                                                            title="Move Down"
+                                                                        >
+                                                                            <ChevronDown className="w-4 h-4 stroke-[3]" />
+                                                                        </button>
                                                                     </div>
-                                                                ) : isPinned ? (
-                                                                    /* Static Badge for Pinned */
-                                                                    <div className="bg-[#F59E0B] text-white px-2.5 py-1 rounded-[6px] text-[12px] font-bold flex items-center gap-1 min-w-[45px] justify-center shadow-md shadow-amber-200/20">
-                                                                        <span className="text-[10px]">★</span>
-                                                                        <span>{displayOrder}</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    /* Not pinned: show empty dash */
-                                                                    <span className="text-slate-300 text-sm font-medium">—</span>
                                                                 )}
+
+                                                                <div className="flex items-center gap-1">
+                                                                    {selected ? (
+                                                                        /* Editable Badge when row is selected */
+                                                                        <div className="relative group/badge">
+                                                                            <div className={`px-2 py-1 rounded-[6px] text-[12px] font-bold flex items-center gap-1 min-w-[50px] justify-center transition-all ${isPinned ? 'bg-[#F59E0B] text-white shadow-lg shadow-amber-200/50' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                                                                                <span className="text-[10px] opacity-70">★</span>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="1"
+                                                                                    value={displayOrder ?? ''}
+                                                                                    onChange={(e) => handleOrderChange(product, e.target.value)}
+                                                                                    onBlur={() => triggerConflictModal(product)}
+                                                                                    className="w-8 bg-transparent text-center focus:outline-none border-none p-0 text-[12px] font-bold placeholder:text-current/30"
+                                                                                    placeholder="—"
+                                                                                />
+                                                                            </div>
+                                                                            {isPinned && (
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        unpinProduct(product);
+                                                                                    }}
+                                                                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-slate-400 text-white flex items-center justify-center hover:bg-red-500 transition-colors shadow-sm"
+                                                                                    title="Remove Pin"
+                                                                                >
+                                                                                    <X className="w-3 h-3 stroke-[3]" />
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : isPinned ? (
+                                                                        /* Static Badge for Pinned */
+                                                                        <div className="bg-[#F59E0B] text-white px-2.5 py-1 rounded-[6px] text-[12px] font-bold flex items-center gap-1 min-w-[45px] justify-center shadow-md shadow-amber-200/20">
+                                                                            <span className="text-[10px]">★</span>
+                                                                            <span>{displayOrder}</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        /* Not pinned: show empty dash */
+                                                                        <span className="text-slate-300 text-sm font-medium">—</span>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
+                                                        </td>
+                                                    )}
 
                                                     {/* Image */}
                                                     <td className="py-3 px-4">
@@ -1640,7 +1804,15 @@ const Products = () => {
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            <p className="text-xs text-gray-400">{product.productType}</p>
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <p className="text-xs text-gray-400">{product.productType}</p>
+                                                                {isHumanitiees && (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider border border-emerald-100">
+                                                                        <Store className="w-2.5 h-2.5" />
+                                                                        Humanitiees
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </td>
 
@@ -1725,7 +1897,7 @@ const Products = () => {
                                                     {/* Actions */}
                                                     <td className="py-3 px-4 text-right">
                                                         <div className="flex items-center justify-end gap-2">
-                                                            <button 
+                                                            <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handleBulkFeatured(null, null, !product.is_featured, code);

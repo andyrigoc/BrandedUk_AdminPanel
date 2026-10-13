@@ -9,6 +9,8 @@ import {
     Eye,
     EyeOff
 } from 'lucide-react'
+import { API_BASE } from '../config'
+import { isAdminUser } from '../adminAuth'
 
 const Login = ({ onLogin }) => {
     const [email, setEmail] = useState('')
@@ -22,15 +24,26 @@ const Login = ({ onLogin }) => {
         setLoading(true)
         setError('')
 
-        // Simulate API call
-        setTimeout(() => {
-            if (email === 'info@brandeduk.com' && password === 'omglol123') {
-                onLogin({ name: 'Admin User', email })
-            } else {
-                setError('Unauthorized access. Please check your credentials.')
-                setLoading(false)
+        try {
+            const response = await fetch(`${API_BASE}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            })
+            const result = await response.json().catch(() => ({}))
+            const user = result?.data?.user
+            const token = result?.data?.token
+
+            if (!response.ok || !token || !isAdminUser(user)) {
+                throw new Error('Unauthorized access. Please check your administrator credentials.')
             }
-        }, 800)
+
+            onLogin({ user, token })
+        } catch (loginError) {
+            setError(loginError.message || 'Unable to sign in right now.')
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (

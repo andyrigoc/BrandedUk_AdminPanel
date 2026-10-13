@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Card from '../components/Card'
 import {
     Search,
@@ -28,13 +28,20 @@ import {
     Download,
     Trash2,
     X,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Send,
+    BadgePercent,
+    ArrowLeft,
+    ChevronRight,
+    UserX
 } from 'lucide-react'
 
 import { API_BASE } from '../config'
 import WorkflowDropdown, { WORKFLOW_STATUSES, getStatusStyle } from '../components/WorkflowDropdown'
 
 const Orders = () => {
+    const navigate = useNavigate()
+    const { orderId } = useParams()
     const [searchParams] = useSearchParams()
     const [orders, setOrders] = useState([])
     const [loading, setLoading] = useState(true)
@@ -48,7 +55,14 @@ const Orders = () => {
     const [deletingOrder, setDeletingOrder] = useState(null)
     const [selectedOrders, setSelectedOrders] = useState(new Set())
     const [bulkDeleting, setBulkDeleting] = useState(false)
+    const [deletingCustomerKey, setDeletingCustomerKey] = useState(null)
+    const [quoteAdjustments, setQuoteAdjustments] = useState({})
+    const [sendingQuote, setSendingQuote] = useState(null)
+    const [quoteActionMessage, setQuoteActionMessage] = useState(null)
+    const [loadedRevisionOrderIds, setLoadedRevisionOrderIds] = useState(new Set())
+    const [revisionTotals, setRevisionTotals] = useState({})
     const requestedOpenOrderId = searchParams.get('open')
+    const isDetailPage = Boolean(orderId)
 
     useEffect(() => {
         fetchOrders()
@@ -60,15 +74,26 @@ const Orders = () => {
         const targetOrder = orders.find((order) => String(order.id) === String(requestedOpenOrderId))
         if (!targetOrder) return
 
+        navigate(`/orders/${encodeURIComponent(targetOrder.quote_id || targetOrder.id)}`, { replace: true })
+    }, [orders, requestedOpenOrderId, navigate])
+
+    useEffect(() => {
+        if (!orderId || orders.length === 0) return
+
+        const targetOrder = orders.find((order) => (
+            String(order.id) === String(orderId) || String(order.quote_id) === String(orderId)
+        ))
+        if (!targetOrder) return
+
         setExpandedOrder(targetOrder.id)
+        hydrateLatestQuoteRevision(targetOrder)
+    }, [orders, orderId])
 
-        const timeoutId = window.setTimeout(() => {
-            const element = document.getElementById(`invoice-content-${targetOrder.id}`)
-            element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }, 150)
-
+    useEffect(() => {
+        if (!quoteActionMessage) return
+        const timeoutId = window.setTimeout(() => setQuoteActionMessage(null), 4200)
         return () => window.clearTimeout(timeoutId)
-    }, [orders, requestedOpenOrderId])
+    }, [quoteActionMessage])
 
     const fetchOrders = async () => {
         setLoading(true)
@@ -117,9 +142,7 @@ const Orders = () => {
         }
     }
 
-    const PDF_SNAPSHOT_WIDTH = 1560
-    const PDF_PAGE_WIDTH_MM = 458
-    const PDF_PAGE_HEIGHT_MM = 324
+    const PDF_SNAPSHOT_WIDTH = 1120
     const PDF_PAGE_PADDING_PX = 24
 
     const buildPrintDocument = (content) => {
@@ -158,12 +181,12 @@ const Orders = () => {
 
                         @page {
                             margin: 0;
-                            size: ${PDF_PAGE_WIDTH_MM}mm ${PDF_PAGE_HEIGHT_MM}mm;
+                            size: A4 landscape;
                         }
 
                         @media print {
                             @page {
-                                size: ${PDF_PAGE_WIDTH_MM}mm ${PDF_PAGE_HEIGHT_MM}mm;
+                                size: A4 landscape;
                                 margin: 0;
                             }
 
@@ -175,7 +198,7 @@ const Orders = () => {
                             }
 
                             body {
-                                padding: ${PDF_PAGE_PADDING_PX}px;
+                                padding: 8px;
                             }
 
                             .pdf-print-root {
@@ -186,6 +209,8 @@ const Orders = () => {
                                 transform: none !important;
                                 rotate: none !important;
                                 writing-mode: horizontal-tb !important;
+                                break-inside: avoid !important;
+                                page-break-inside: avoid !important;
                             }
 
                             .pdf-print-root,
@@ -198,6 +223,105 @@ const Orders = () => {
                                 color: inherit !important;
                                 text-decoration: none !important;
                             }
+
+                            .quote-admin-only {
+                                display: none !important;
+                            }
+
+                            .quote-print-shell {
+                                border: 0 !important;
+                                box-shadow: none !important;
+                                background: #ffffff !important;
+                            }
+
+                            .quote-print-content {
+                                padding: 0 !important;
+                            }
+
+                            .quote-print-layout {
+                                display: grid !important;
+                                grid-template-columns: 31% minmax(0, 69%) !important;
+                                gap: 14px !important;
+                                padding: 0 !important;
+                                background: #ffffff !important;
+                                align-items: start !important;
+                                break-inside: avoid !important;
+                                page-break-inside: avoid !important;
+                            }
+
+                            .quote-print-sidebar,
+                            .quote-print-main {
+                                min-width: 0 !important;
+                            }
+
+                            .quote-print-sidebar > * + *,
+                            .quote-print-main > * + * {
+                                margin-top: 12px !important;
+                            }
+
+                            .quote-print-card {
+                                padding: 12px !important;
+                                border-radius: 12px !important;
+                                box-shadow: none !important;
+                                break-inside: avoid;
+                            }
+
+                            .quote-print-card h4 {
+                                margin-bottom: 8px !important;
+                            }
+
+                            .quote-print-card .space-y-3 > * + *,
+                            .quote-print-card .space-y-4 > * + * {
+                                margin-top: 7px !important;
+                            }
+
+                            .quote-print-logo-preview {
+                                height: 112px !important;
+                            }
+
+                            .quote-print-cost {
+                                padding: 14px !important;
+                                border-radius: 14px !important;
+                                box-shadow: none !important;
+                                break-inside: avoid;
+                            }
+
+                            .quote-print-cost h4 {
+                                margin-bottom: 10px !important;
+                                font-size: 18px !important;
+                            }
+
+                            .quote-print-cost .space-y-4 > * + * {
+                                margin-top: 8px !important;
+                            }
+
+                            .quote-print-cost .p-5,
+                            .quote-print-cost .lg\\:p-6 {
+                                padding: 11px !important;
+                            }
+
+                            .quote-print-cost .text-2xl,
+                            .quote-print-cost .lg\\:text-3xl {
+                                font-size: 19px !important;
+                                line-height: 1.15 !important;
+                            }
+
+                            .quote-print-items {
+                                box-shadow: none !important;
+                                border-radius: 12px !important;
+                                break-inside: avoid;
+                            }
+
+                            .quote-print-items .p-4,
+                            .quote-print-items .p-6 {
+                                padding: 10px !important;
+                            }
+
+                            .quote-print-items .w-16.h-16 {
+                                width: 48px !important;
+                                height: 48px !important;
+                            }
+
                         }
                     </style>
                 </head>
@@ -344,6 +468,71 @@ const Orders = () => {
         if (failed.length > 0) alert(`${failed.length} order(s) failed to delete.`)
     }
 
+    const getCustomerKey = (order) => {
+        const email = String(order.customer_email || '').trim().toLowerCase()
+        if (email) return `email:${email}`
+        return `name:${String(order.customer_name || '').trim().toLowerCase()}`
+    }
+
+    const handleDeleteCustomerOrders = async (order) => {
+        const customerKey = getCustomerKey(order)
+        setDeletingCustomerKey(customerKey)
+
+        let allOrders = orders
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/quotes?limit=10000`)
+            if (response.ok) {
+                const data = await response.json()
+                allOrders = data.items || orders
+            }
+        } catch (error) {
+            console.warn('Could not load the full customer order list before deletion:', error)
+        }
+
+        const customerOrders = allOrders.filter((item) => getCustomerKey(item) === customerKey)
+        if (customerOrders.length === 0) {
+            setDeletingCustomerKey(null)
+            return
+        }
+        const customerLabel = order.customer_email || order.customer_name || 'this customer'
+        const confirmed = window.confirm(
+            `Delete all ${customerOrders.length} order${customerOrders.length === 1 ? '' : 's'} for ${customerLabel}? This cannot be undone.`
+        )
+        if (!confirmed) {
+            setDeletingCustomerKey(null)
+            return
+        }
+
+        const failedIds = []
+
+        await Promise.all(customerOrders.map(async (customerOrder) => {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/quotes/${customerOrder.id}`, { method: 'DELETE' })
+                if (!response.ok) failedIds.push(customerOrder.id)
+            } catch {
+                failedIds.push(customerOrder.id)
+            }
+        }))
+
+        const customerOrderIds = new Set(customerOrders.map((item) => item.id))
+        setOrders((prev) => prev.filter((item) => !customerOrderIds.has(item.id) || failedIds.includes(item.id)))
+        setSelectedOrders((prev) => {
+            const next = new Set(prev)
+            customerOrders.forEach((item) => {
+                if (!failedIds.includes(item.id)) next.delete(item.id)
+            })
+            return next
+        })
+        setDeletingCustomerKey(null)
+
+        setQuoteActionMessage({
+            type: failedIds.length > 0 ? 'error' : 'success',
+            message: failedIds.length > 0
+                ? `${customerOrders.length - failedIds.length} orders deleted. ${failedIds.length} could not be deleted.`
+                : `Deleted all ${customerOrders.length} orders for ${customerLabel}.`
+        })
+    }
+
     const handleDeleteOrder = async (order) => {
         const confirmed = window.confirm(`Delete quote ${order.quote_id} for ${order.customer_name || 'this customer'}?`)
         if (!confirmed) return
@@ -396,6 +585,375 @@ const Orders = () => {
         }
     }
 
+    const money = (value) => {
+        const amount = Number(value)
+        return Number.isFinite(amount) ? amount : 0
+    }
+
+    const formatMoney = (value) => `£${money(value).toFixed(2)}`
+
+    const getBasketQuantity = (item) => {
+        if (item?.quantity !== undefined) return money(item.quantity)
+        if (item?.sizes && typeof item.sizes === 'object') {
+            return Object.values(item.sizes).reduce((total, qty) => total + money(qty), 0)
+        }
+        return 1
+    }
+
+    const getBasketTotal = (basket) => basket.reduce((total, item) => {
+        const quantity = getBasketQuantity(item)
+        return total + money(item.itemTotal ?? item.lineTotal ?? item.totalPrice ?? item.total ?? money(item.unitPrice) * quantity)
+    }, 0)
+
+    const getAdjustedAmount = (orderId, lineKey, originalAmount) => {
+        const rawValue = quoteAdjustments[String(orderId)]?.[lineKey]
+        if (rawValue === undefined || rawValue === '') return money(originalAmount)
+
+        const parsed = Number(rawValue)
+        return Number.isFinite(parsed) ? Math.max(0, parsed) : money(originalAmount)
+    }
+
+    const updateQuoteAmount = (orderId, lineKey, value) => {
+        setQuoteAdjustments((prev) => ({
+            ...prev,
+            [String(orderId)]: {
+                ...(prev[String(orderId)] || {}),
+                [lineKey]: value
+            }
+        }))
+    }
+
+    const resetQuoteAdjustments = (orderId) => {
+        setQuoteAdjustments((prev) => {
+            const next = { ...prev }
+            delete next[String(orderId)]
+            return next
+        })
+    }
+
+    const getRevisionSnapshot = (revision) => {
+        const snapshot = revision?.snapshot_json ?? revision?.snapshotJson ?? revision?.snapshot
+        if (!snapshot) return null
+
+        if (typeof snapshot === 'string') {
+            try {
+                return JSON.parse(snapshot)
+            } catch {
+                return null
+            }
+        }
+
+        return snapshot
+    }
+
+    const getLatestRevision = (items = []) => {
+        return [...items].sort((a, b) => {
+            const dateA = new Date(a.sent_at || a.sentAt || a.created_at || a.createdAt || 0)
+            const dateB = new Date(b.sent_at || b.sentAt || b.created_at || b.createdAt || 0)
+            return dateB - dateA
+        })[0]
+    }
+
+    const buildAdjustmentsFromSnapshot = (snapshot) => {
+        const adjustments = {}
+        const totals = snapshot?.totals || {}
+
+        if (totals.garmentAdjustedLineTotal !== undefined && totals.garmentAdjustedLineTotal !== null) {
+            adjustments['garment-cost'] = String(money(totals.garmentAdjustedLineTotal).toFixed(2))
+        }
+
+        if (totals.digitizingAdjustedLineTotal !== undefined && totals.digitizingAdjustedLineTotal !== null) {
+            adjustments['digitizing-fee'] = String(money(totals.digitizingAdjustedLineTotal).toFixed(2))
+        }
+
+        ;(snapshot?.customizations || []).forEach((customization, idx) => {
+            if (customization.adjustedLineTotal !== undefined && customization.adjustedLineTotal !== null) {
+                adjustments[`customization-${idx}`] = String(money(customization.adjustedLineTotal).toFixed(2))
+            }
+        })
+
+        return adjustments
+    }
+
+    const getRevisionTotalsFromMetadata = (revision) => {
+        if (!revision) return null
+
+        const originalTotalIncVat = money(revision.original_total ?? revision.originalTotal ?? revision.originalTotalIncVat)
+        const totalIncVat = money(revision.adjusted_total ?? revision.adjustedTotal ?? revision.totalIncVat)
+        const discountAmount = money(revision.discount_amount ?? revision.discountAmount)
+        const discountPercent = money(revision.discount_percent ?? revision.discountPercent)
+
+        if (!originalTotalIncVat && !totalIncVat) return null
+
+        return {
+            originalTotalIncVat,
+            totalIncVat,
+            discountAmount,
+            discountPercent,
+            hasChanges: Math.abs(originalTotalIncVat - totalIncVat) > 0.009
+        }
+    }
+
+    const hydrateLatestQuoteRevision = async (order) => {
+        const orderKey = String(order.id)
+        if (loadedRevisionOrderIds.has(orderKey)) return
+
+        setLoadedRevisionOrderIds((prev) => new Set([...prev, orderKey]))
+
+        try {
+            const quoteIdentifier = encodeURIComponent(order.id || order.quote_id)
+            const response = await fetch(`${API_BASE}/api/admin/quotes/${quoteIdentifier}/revisions`)
+            if (!response.ok) return
+
+            const data = await response.json()
+            const latestRevision = getLatestRevision(data.data?.items || [])
+            const metadataTotals = getRevisionTotalsFromMetadata(latestRevision)
+            if (metadataTotals) {
+                setRevisionTotals((prev) => ({
+                    ...prev,
+                    [orderKey]: metadataTotals
+                }))
+                setOrders((prev) => prev.map((item) => (
+                    String(item.id) === orderKey ? { ...item, status: 'Quote Sent' } : item
+                )))
+            }
+
+            let snapshot = getRevisionSnapshot(latestRevision)
+            if (!snapshot && latestRevision?.id) {
+                const detailResponse = await fetch(`${API_BASE}/api/admin/quotes/${quoteIdentifier}/revisions/${encodeURIComponent(latestRevision.id)}`)
+                if (detailResponse.ok) {
+                    const detailData = await detailResponse.json()
+                    snapshot = getRevisionSnapshot(detailData.data)
+                }
+            }
+            if (!snapshot) return
+
+            const adjustments = buildAdjustmentsFromSnapshot(snapshot)
+            const snapshotTotals = snapshot.totals
+            if (snapshotTotals) {
+                setRevisionTotals((prev) => ({
+                    ...prev,
+                    [orderKey]: {
+                        originalTotalIncVat: money(snapshotTotals.originalTotalIncVat),
+                        totalIncVat: money(snapshotTotals.totalIncVat),
+                        discountAmount: money(snapshotTotals.discountAmount),
+                        discountPercent: money(snapshotTotals.discountPercent),
+                        hasChanges: Math.abs(money(snapshotTotals.originalTotalIncVat) - money(snapshotTotals.totalIncVat)) > 0.009
+                    }
+                }))
+            }
+            if (Object.keys(adjustments).length === 0) return
+
+            setQuoteAdjustments((prev) => ({
+                ...prev,
+                [orderKey]: {
+                    ...(prev[orderKey] || {}),
+                    ...adjustments
+                }
+            }))
+            setOrders((prev) => prev.map((item) => (
+                String(item.id) === orderKey ? { ...item, status: 'Quote Sent' } : item
+            )))
+        } catch (error) {
+            console.error('Error loading quote revision:', error)
+            setLoadedRevisionOrderIds((prev) => {
+                const next = new Set(prev)
+                next.delete(orderKey)
+                return next
+            })
+        }
+    }
+
+    const buildQuotePreview = (order, basket, customizations, summary) => {
+        const orderId = String(order.id)
+        const lines = []
+        const garmentOriginal = money(summary.garmentCost ?? getBasketTotal(basket))
+
+        if (garmentOriginal > 0) {
+            lines.push({
+                key: 'garment-cost',
+                type: 'garment',
+                label: 'Garment Cost',
+                description: `${money(summary.totalQuantity) || basket.reduce((total, item) => total + getBasketQuantity(item), 0)} item${(money(summary.totalQuantity) || basket.length) === 1 ? '' : 's'}`,
+                original: garmentOriginal,
+                adjusted: getAdjustedAmount(orderId, 'garment-cost', garmentOriginal)
+            })
+        }
+
+        customizations.forEach((cust, idx) => {
+            const original = money(cust.lineTotal ?? money(cust.unitPrice) * money(cust.quantity || 1))
+            if (original <= 0) return
+
+            const labelParts = [cust.position || cust.positionSlug, cust.method].filter(Boolean)
+            lines.push({
+                key: `customization-${idx}`,
+                type: 'customization',
+                label: labelParts.length ? labelParts.join(' ') : `Customization ${idx + 1}`,
+                description: `Qty ${cust.quantity || 1}${cust.unitPrice !== undefined ? ` at ${formatMoney(cust.unitPrice)}` : ''}`,
+                original,
+                adjusted: getAdjustedAmount(orderId, `customization-${idx}`, original)
+            })
+        })
+
+        const digitizingOriginal = money(summary.digitizingFee)
+        if (digitizingOriginal > 0) {
+            lines.push({
+                key: 'digitizing-fee',
+                type: 'setup',
+                label: 'Digitisation / Setup Fee',
+                description: 'One-time template setup fee',
+                original: digitizingOriginal,
+                adjusted: getAdjustedAmount(orderId, 'digitizing-fee', digitizingOriginal)
+            })
+        }
+
+        const originalSubtotalFromLines = lines.reduce((total, line) => total + line.original, 0)
+        const adjustedSubtotalFromLines = lines.reduce((total, line) => total + line.adjusted, 0)
+        const fallbackSubtotal = money(summary.totalExVat ?? summary.subtotal)
+        const originalSubtotal = originalSubtotalFromLines || fallbackSubtotal
+        const adjustedSubtotal = adjustedSubtotalFromLines || fallbackSubtotal
+        const vatRate = Number.isFinite(Number(summary.vatRate))
+            ? Number(summary.vatRate)
+            : (originalSubtotal > 0 && summary.vatAmount !== undefined ? money(summary.vatAmount) / originalSubtotal : 0.2)
+        const vatAmount = adjustedSubtotal * vatRate
+        const totalIncVat = adjustedSubtotal + vatAmount
+        const originalTotalIncVat = money(summary.totalIncVat) || (originalSubtotal * (1 + vatRate))
+        const discountAmount = Math.max(0, originalTotalIncVat - totalIncVat)
+        const discountPercent = originalTotalIncVat > 0 ? (discountAmount / originalTotalIncVat) * 100 : 0
+        const hasChanges = lines.some((line) => Math.abs(line.original - line.adjusted) > 0.009)
+        const savedTotals = revisionTotals[orderId]
+
+        return {
+            lines,
+            originalSubtotal,
+            adjustedSubtotal,
+            vatRate,
+            vatAmount,
+            totalIncVat: savedTotals?.totalIncVat ?? totalIncVat,
+            originalTotalIncVat: savedTotals?.originalTotalIncVat ?? originalTotalIncVat,
+            discountAmount: savedTotals?.discountAmount ?? discountAmount,
+            discountPercent: savedTotals?.discountPercent ?? discountPercent,
+            hasChanges: savedTotals?.hasChanges ?? hasChanges
+        }
+    }
+
+    const buildQuoteSnapshot = (order, basket, customizations, logos, quotePreview) => {
+        const lineByKey = quotePreview.lines.reduce((acc, line) => {
+            acc[line.key] = line
+            return acc
+        }, {})
+        const garmentLine = lineByKey['garment-cost']
+        const digitizingLine = lineByKey['digitizing-fee']
+        const productOriginalTotal = basket.reduce((total, item) => (
+            total + money(item.itemTotal ?? item.lineTotal ?? item.totalPrice ?? item.total ?? money(item.unitPrice) * getBasketQuantity(item))
+        ), 0)
+
+        return {
+            customer: {
+                name: order.customer_name || '',
+                email: order.customer_email || '',
+                phone: order.customer_phone || '',
+                company: order.customer_company || '',
+                address: order.customer_address || ''
+            },
+            products: basket.map((item) => {
+                const originalLineTotal = money(item.itemTotal ?? item.lineTotal ?? item.totalPrice ?? item.total ?? money(item.unitPrice) * getBasketQuantity(item))
+                const adjustedLineTotal = garmentLine && productOriginalTotal > 0
+                    ? (originalLineTotal / productOriginalTotal) * garmentLine.adjusted
+                    : originalLineTotal
+
+                return {
+                    code: item.code || '',
+                    name: item.name || '',
+                    colour: item.color || item.colour || '',
+                    image: typeof item.image === 'string' ? item.image : item.image?.url || '',
+                    sizes: item.sizes || (item.size ? { [item.size]: item.quantity || 1 } : {}),
+                    quantity: getBasketQuantity(item),
+                    unitPrice: money(item.unitPrice),
+                    originalLineTotal,
+                    adjustedLineTotal
+                }
+            }),
+            customizations: customizations.map((cust, idx) => {
+                const line = lineByKey[`customization-${idx}`]
+                return {
+                    method: cust.method || '',
+                    position: cust.position || cust.positionSlug || '',
+                    quantity: money(cust.quantity || 1),
+                    unitPrice: money(cust.unitPrice),
+                    originalLineTotal: money(cust.lineTotal ?? money(cust.unitPrice) * money(cust.quantity || 1)),
+                    adjustedLineTotal: line ? line.adjusted : money(cust.lineTotal ?? money(cust.unitPrice) * money(cust.quantity || 1)),
+                    text: cust.text || ''
+                }
+            }),
+            logos: logos || {},
+            totals: {
+                originalSubtotal: quotePreview.originalSubtotal,
+                adjustedSubtotal: quotePreview.adjustedSubtotal,
+                vatRate: quotePreview.vatRate,
+                vatAmount: quotePreview.vatAmount,
+                originalTotalIncVat: quotePreview.originalTotalIncVat,
+                totalIncVat: quotePreview.totalIncVat,
+                discountAmount: quotePreview.discountAmount,
+                discountPercent: quotePreview.discountPercent,
+                garmentOriginalLineTotal: garmentLine?.original ?? 0,
+                garmentAdjustedLineTotal: garmentLine?.adjusted ?? 0,
+                digitizingOriginalLineTotal: digitizingLine?.original ?? 0,
+                digitizingAdjustedLineTotal: digitizingLine?.adjusted ?? 0
+            }
+        }
+    }
+
+    const handleSendQuote = async (order, basket, customizations, logos, quotePreview) => {
+        setSendingQuote(order.id)
+
+        const payload = buildQuoteSnapshot(order, basket, customizations, logos, quotePreview)
+
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/quotes/${encodeURIComponent(order.id || order.quote_id)}/send-quote`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            const data = await response.json().catch(() => ({}))
+
+            if (!response.ok || data.success === false) {
+                throw new Error(data.message || 'Failed to send quote')
+            }
+
+            setOrders((prev) => prev.map((item) => (
+                item.id === order.id ? { ...item, status: data.data?.status || 'Quote Sent' } : item
+            )))
+            setRevisionTotals((prev) => ({
+                ...prev,
+                [String(order.id)]: {
+                    originalTotalIncVat: quotePreview.originalTotalIncVat,
+                    totalIncVat: quotePreview.totalIncVat,
+                    discountAmount: quotePreview.discountAmount,
+                    discountPercent: quotePreview.discountPercent,
+                    hasChanges: quotePreview.hasChanges
+                }
+            }))
+            setLoadedRevisionOrderIds((prev) => {
+                const next = new Set(prev)
+                next.delete(String(order.id))
+                return next
+            })
+            setQuoteActionMessage({
+                type: 'success',
+                message: `Quote sent to ${data.data?.sentTo || payload.customer.email}.`
+            })
+        } catch (error) {
+            console.error('Error sending quote:', error)
+            setQuoteActionMessage({
+                type: 'error',
+                message: error.message || 'Could not send quote. Please try again.'
+            })
+        } finally {
+            setSendingQuote(null)
+        }
+    }
+
     const sortedOrders = [...orders]
         .filter(order => {
             const matchesSearch =
@@ -417,6 +975,11 @@ const Orders = () => {
             }
             return 0
         })
+    const detailOrders = isDetailPage
+        ? sortedOrders.filter((order) => (
+            String(order.id) === String(orderId) || String(order.quote_id) === String(orderId)
+        ))
+        : []
 
     const stats = {
         total: orders.length,
@@ -437,56 +1000,95 @@ const Orders = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-12">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">Quote Requests</h1>
-                    <p className="text-slate-500 font-medium mt-1">Manage incoming quote requests and orders.</p>
+        <div className={`${isDetailPage ? 'max-w-7xl space-y-8' : 'max-w-[1500px] space-y-5'} mx-auto pb-12`}>
+            {quoteActionMessage && (
+                <div className="fixed bottom-8 right-8 z-[120] w-[360px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/15">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+                            <Send className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-xs font-black text-slate-900 uppercase tracking-widest">Quote action</div>
+                            <p className="text-sm font-semibold text-slate-600 mt-1 leading-relaxed">{quoteActionMessage.message}</p>
+                        </div>
+                        <button
+                            onClick={() => setQuoteActionMessage(null)}
+                            className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
+            )}
 
-                {/* Status Tabs */}
-                <div className="flex p-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
-                    <button
-                        onClick={() => setStatusFilter('all')}
-                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all uppercase tracking-wider whitespace-nowrap
-                            ${statusFilter === 'all'
-                                ? 'bg-slate-900 text-white shadow-md'
-                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                            }`}
-                    >
-                        All
-                    </button>
-                    {WORKFLOW_STATUSES.map((ws) => {
-                        const style = statusFilter === ws.key
-                            ? { backgroundColor: ws.bg, color: ws.text, borderColor: ws.border }
-                            : {}
-                        return (
+            {/* Header Area */}
+            <div className={`flex flex-col md:flex-row justify-between ${isDetailPage ? 'md:items-end gap-6' : 'md:items-center gap-4'}`}>
+                {isDetailPage ? (
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => navigate('/')}
+                            className="w-11 h-11 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-primary hover:border-primary/40 flex items-center justify-center shadow-sm transition-all"
+                            title="Back to orders"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <div>
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">Order Detail</div>
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tight mt-1">{orderId}</h1>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div>
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Quote Requests</h1>
+                            <p className="text-sm text-slate-500 font-medium mt-1">Review and manage customer quote requests.</p>
+                        </div>
+
+                        <div className="flex p-1 bg-white border border-slate-200 rounded-lg shadow-sm overflow-x-auto max-w-full">
                             <button
-                                key={ws.key}
-                                onClick={() => setStatusFilter(ws.key)}
-                                style={style}
-                                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all uppercase tracking-wider whitespace-nowrap border
-                                    ${statusFilter === ws.key
-                                        ? 'shadow-md border-transparent'
-                                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 border-transparent'
+                                onClick={() => setStatusFilter('all')}
+                                className={`px-3 py-1.5 text-[11px] font-bold rounded-md transition-all uppercase tracking-wider whitespace-nowrap
+                                    ${statusFilter === 'all'
+                                        ? 'bg-slate-900 text-white shadow-md'
+                                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                                     }`}
                             >
-                                {ws.label}
+                                All
                             </button>
-                        )
-                    })}
-                </div>
+                            {WORKFLOW_STATUSES.map((ws) => {
+                                const style = statusFilter === ws.key
+                                    ? { backgroundColor: ws.bg, color: ws.text, borderColor: ws.border }
+                                    : {}
+                                return (
+                                    <button
+                                        key={ws.key}
+                                        onClick={() => setStatusFilter(ws.key)}
+                                        style={style}
+                                        className={`px-3 py-1.5 text-[11px] font-bold rounded-md transition-all uppercase tracking-wider whitespace-nowrap border
+                                            ${statusFilter === ws.key
+                                                ? 'shadow-md border-transparent'
+                                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 border-transparent'
+                                            }`}
+                                    >
+                                        {ws.label}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </>
+                )}
             </div>
 
+            {!isDetailPage && (
+                <>
             {/* Filters & Search Row */}
-            <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                <div className="relative flex-1 flex items-center gap-3">
+            <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+                <div className="relative flex-1 flex items-center gap-2">
                     {/* Select All Checkbox */}
                     {sortedOrders.length > 0 && (
                         <button
                             onClick={toggleSelectAll}
-                            className={`w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all
+                            className={`w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all
                                 ${selectedOrders.size === sortedOrders.length && sortedOrders.length > 0
                                     ? 'bg-primary border-primary text-white'
                                     : selectedOrders.size > 0
@@ -505,22 +1107,22 @@ const Orders = () => {
                         </button>
                     )}
                     <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search by ID, Name or Email..."
-                        className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm font-semibold text-slate-700"
+                        className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm text-sm font-semibold text-slate-700"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-6">
+                <div className="flex flex-wrap items-center gap-3">
                     {/* Sort Controls */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Sort By:</span>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5">
                             <button
                                 onClick={() => {
                                     if (sortBy === 'date') {
@@ -530,7 +1132,7 @@ const Orders = () => {
                                         setSortOrder('desc')
                                     }
                                 }}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all
                                     ${sortBy === 'date'
                                         ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
                                         : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
@@ -552,7 +1154,7 @@ const Orders = () => {
                                         setSortOrder('desc')
                                     }
                                 }}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all
                                     ${sortBy === 'price'
                                         ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
                                         : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
@@ -568,26 +1170,27 @@ const Orders = () => {
                     </div>
 
                     {/* Quick Stats - Mini Cards */}
-                    <div className="flex gap-4">
-                        <div className="px-6 py-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 min-w-[140px]">
-                            <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                                <Clock className="w-5 h-5" />
+                    <div className="flex gap-2">
+                        <div className="px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm flex items-center gap-2 min-w-[100px]">
+                            <div className="w-7 h-7 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                <Clock className="w-4 h-4" />
                             </div>
                             <div>
                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pending</div>
-                                <div className="text-lg font-black text-slate-800">{orders.filter(o => o.status === 'Pending').length}</div>
+                                <div className="text-sm font-black text-slate-800">{orders.filter(o => o.status === 'Pending').length}</div>
                             </div>
                         </div>
-                        <div className="px-6 py-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 min-w-[140px]">
-                            <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                <PoundSterling className="w-5 h-5" />
+                        <div className="px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm flex items-center gap-2 min-w-[115px]">
+                            <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                <PoundSterling className="w-4 h-4" />
                             </div>
                             <div>
                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Value</div>
-                                <div className="text-lg font-black text-slate-800">
+                                <div className="text-sm font-black text-slate-800">
                                     £{orders.reduce((acc, curr) => {
-                                        const { summary } = parseQuoteData(curr)
-                                        const amount = parseFloat(curr.total_amount) || summary.totalIncVat || 0
+                                        const { basket, customizations, summary } = parseQuoteData(curr)
+                                        const preview = buildQuotePreview(curr, basket, customizations, summary)
+                                        const amount = preview.totalIncVat || parseFloat(curr.total_amount) || summary.totalIncVat || 0
                                         return acc + amount
                                     }, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
@@ -622,38 +1225,182 @@ const Orders = () => {
                     </div>
                 </div>
             )}
+                </>
+            )}
 
             {/* Orders List */}
             <div className="space-y-4">
-                {sortedOrders.length === 0 ? (
-                    <div className="bg-white rounded-3xl border border-slate-200 p-16 text-center">
-                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <ShoppingCart className="w-10 h-10 text-slate-300" />
+                {!isDetailPage ? (
+                    sortedOrders.length === 0 ? (
+                        <div className="bg-white rounded-3xl border border-slate-200 p-16 text-center">
+                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <ShoppingCart className="w-10 h-10 text-slate-300" />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800 mb-2">No Requests Found</h3>
+                            <p className="text-slate-500 max-w-md mx-auto">
+                                Try adjusting your search terms or filters to find what you're looking for.
+                            </p>
                         </div>
-                        <h3 className="text-xl font-black text-slate-800 mb-2">No Requests Found</h3>
-                        <p className="text-slate-500 max-w-md mx-auto">
-                            Try adjusting your search terms or filters to find what you're looking for.
-                        </p>
+                    ) : (
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[1080px]">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-b border-slate-200">
+                                            <th className="w-12 px-3 py-3 text-left">
+                                                <button
+                                                    onClick={toggleSelectAll}
+                                                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                                                        selectedOrders.size === sortedOrders.length
+                                                            ? 'bg-primary border-primary text-white'
+                                                            : 'bg-white border-slate-300 text-transparent'
+                                                    }`}
+                                                    title="Select all"
+                                                >
+                                                    <CheckCircle className="w-3.5 h-3.5" />
+                                                </button>
+                                            </th>
+                                            {['Quote', 'Customer', 'Company', 'Products', 'Date', 'Status', 'Total', ''].map((heading) => (
+                                                <th key={heading || 'action'} className="px-3 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.12em]">
+                                                    {heading}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {sortedOrders.map((order) => {
+                                            const { basket, customizations, summary } = parseQuoteData(order)
+                                            const quotePreview = buildQuotePreview(order, basket, customizations, summary)
+                                            const displayTotal = quotePreview.totalIncVat || parseFloat(order.total_amount) || summary.totalIncVat || 0
+                                            const statusStyle = getStatusStyle(order.status)
+                                            const quantity = basket.reduce((total, item) => total + getBasketQuantity(item), 0)
+                                            const productNames = basket.map((item) => item.name || item.code).filter(Boolean)
+                                            const primaryProductName = productNames[0] || 'No product details'
+                                            const additionalProductCount = Math.max(0, productNames.length - 1)
+                                            const customerKey = getCustomerKey(order)
+                                            const customerOrderCount = orders.filter((item) => getCustomerKey(item) === customerKey).length
+                                            const isDeletingCustomer = deletingCustomerKey === customerKey
+
+                                            return (
+                                                <tr
+                                                    key={order.id}
+                                                    onClick={() => navigate(`/orders/${encodeURIComponent(order.quote_id || order.id)}`)}
+                                                    className="group cursor-pointer hover:bg-primary/[0.025] transition-colors"
+                                                >
+                                                    <td className="px-3 py-3">
+                                                        <button
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                toggleSelectOrder(order.id)
+                                                            }}
+                                                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                                                                selectedOrders.has(order.id)
+                                                                    ? 'bg-primary border-primary text-white'
+                                                                    : 'bg-white border-slate-300 text-transparent group-hover:border-primary/50'
+                                                            }`}
+                                                        >
+                                                            <CheckCircle className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <div className="font-mono text-[11px] font-black text-slate-800 max-w-[180px] truncate">{order.quote_id}</div>
+                                                        <div className="text-[9px] font-bold text-slate-400 mt-0.5">#{order.id}</div>
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-black text-[10px]">
+                                                                {order.customer_name?.charAt(0) || '?'}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="text-xs font-black text-slate-900">{order.customer_name || 'Unknown customer'}</div>
+                                                                <div className="text-[10px] font-medium text-slate-400 max-w-[190px] truncate">{order.customer_email}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-3 text-xs font-bold text-slate-600 max-w-[160px] truncate">{order.customer_company || '—'}</td>
+                                                    <td className="px-3 py-3 max-w-[230px]">
+                                                        <div className="text-xs font-black text-slate-800 truncate" title={productNames.join(', ')}>{primaryProductName}</div>
+                                                        <div className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                                            Qty {quantity || basket.length}
+                                                            {additionalProductCount > 0 ? ` · +${additionalProductCount} more product${additionalProductCount === 1 ? '' : 's'}` : ''}
+                                                            {customizations.length > 0 ? ` · ${customizations.length} design` : ''}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <div className="text-xs font-bold text-slate-700">{new Date(order.created_at).toLocaleDateString()}</div>
+                                                        <div className="text-[9px] font-bold text-slate-400 mt-0.5">{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <span
+                                                            className="inline-flex px-2 py-1 rounded-md border text-[9px] font-black uppercase tracking-wider"
+                                                            style={{ backgroundColor: statusStyle.bg, color: statusStyle.text, borderColor: statusStyle.border }}
+                                                        >
+                                                            {statusStyle.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <div className="text-sm font-black text-slate-900">{formatMoney(displayTotal)}</div>
+                                                        {quotePreview.hasChanges && <div className="text-[9px] font-black text-emerald-600 uppercase mt-0.5">Adjusted</div>}
+                                                    </td>
+                                                    <td className="px-3 py-3 text-right">
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            <button
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation()
+                                                                    handleDeleteCustomerOrders(order)
+                                                                }}
+                                                                disabled={isDeletingCustomer}
+                                                                title={`Delete all ${customerOrderCount} order${customerOrderCount === 1 ? '' : 's'} for this customer`}
+                                                                className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all disabled:opacity-50"
+                                                            >
+                                                                {isDeletingCustomer ? (
+                                                                    <div className="w-3 h-3 border-2 border-rose-300 border-t-rose-600 rounded-full animate-spin" />
+                                                                ) : (
+                                                                    <UserX className="w-3.5 h-3.5" />
+                                                                )}
+                                                            </button>
+                                                            <button
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation()
+                                                                    navigate(`/orders/${encodeURIComponent(order.quote_id || order.id)}`)
+                                                                }}
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-primary group-hover:text-white text-[10px] font-black transition-all"
+                                                            >
+                                                                <Eye className="w-3.5 h-3.5" />
+                                                                View
+                                                                <ChevronRight className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )
+                ) : detailOrders.length === 0 ? (
+                    <div className="bg-white rounded-3xl border border-slate-200 p-16 text-center">
+                        <h3 className="text-xl font-black text-slate-800 mb-2">Order not found</h3>
+                        <p className="text-slate-500">This order may have been removed or the link is incorrect.</p>
                     </div>
                 ) : (
-                    sortedOrders.map((order) => {
-                        const status = statusConfig[order.status] || statusConfig['Pending']
-                        const StatusIcon = status.icon
-                        const isExpanded = expandedOrder === order.id
+                    detailOrders.map((order) => {
+                        const isExpanded = true
                         const { basket, customizations, summary, logos } = parseQuoteData(order)
+                        const quotePreview = buildQuotePreview(order, basket, customizations, summary)
+                        const displayTotal = quotePreview.totalIncVat || parseFloat(order.total_amount) || summary.totalIncVat || 0
 
                         return (
                             <div
                                 key={order.id}
                                 id={`invoice-content-${order.id}`}
-                                className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden group
+                                className={`quote-print-shell bg-white rounded-2xl border transition-all duration-300 overflow-hidden group
                                     ${isExpanded ? 'border-primary shadow-xl shadow-primary/5 ring-1 ring-primary/5' : 'border-slate-200 hover:border-primary/50'}`}
                             >
                                 {/* Main Order Row */}
-                                <div
-                                    className="p-6 cursor-pointer"
-                                    onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
-                                >
+                                <div data-html2canvas-ignore="true" className="p-6">
                                     <div className="flex flex-col lg:flex-row lg:items-center gap-6">
 
                                         {/* Checkbox */}
@@ -672,13 +1419,6 @@ const Orders = () => {
                                         {/* Status Badge */}
                                         <div className="flex items-center justify-between lg:w-48 shrink-0">
                                             <div className="flex items-center gap-4">
-                                                <button
-                                                    data-html2canvas-ignore="true"
-                                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors 
-                                                        ${isExpanded ? 'bg-primary text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary'}`}
-                                                >
-                                                    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                                                </button>
                                                 <div>
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Status</span>
                                                     <WorkflowDropdown
@@ -691,7 +1431,10 @@ const Orders = () => {
                                             {/* Mobile Total */}
                                             <div className="lg:hidden text-right">
                                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</div>
-                                                <div className="text-lg font-black text-slate-900">£{(parseFloat(order.total_amount) || summary.totalIncVat || 0).toFixed(2)}</div>
+                                                <div className="text-lg font-black text-slate-900">{formatMoney(displayTotal)}</div>
+                                                {quotePreview.hasChanges && (
+                                                    <div className="text-[10px] font-black text-emerald-600 uppercase tracking-wide">Adjusted</div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -724,7 +1467,10 @@ const Orders = () => {
                                         <div className="hidden lg:flex items-center gap-8 border-l border-slate-100 pl-8">
                                             <div className="text-right">
                                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Estimated Total</div>
-                                                <div className="text-xl font-black text-slate-900">£{(parseFloat(order.total_amount) || summary.totalIncVat || 0).toFixed(2)}</div>
+                                                <div className="text-xl font-black text-slate-900">{formatMoney(displayTotal)}</div>
+                                                {quotePreview.hasChanges && (
+                                                    <div className="text-[10px] font-black text-emerald-600 uppercase tracking-wide">Adjusted quote</div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -733,7 +1479,7 @@ const Orders = () => {
                                 {/* Expanded Content */}
                                 {isExpanded && (
                                     <div className="border-t border-slate-100 bg-slate-50/50">
-                                        <div className="p-8">
+                                        <div className="quote-print-content p-8">
                                             {/* Action Bar */}
                                             <div data-html2canvas-ignore="true" className="flex flex-wrap items-center justify-between gap-4 mb-8 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                                 <div className="flex items-center gap-3">
@@ -746,8 +1492,18 @@ const Orders = () => {
                                                     />
                                                 </div>
                                                 <div className="flex gap-2">
-                                                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all">
-                                                        <Mail className="w-3.5 h-3.5" /> Email Customer
+                                                    <button
+                                                        data-html2canvas-ignore="true"
+                                                        onClick={() => handleSendQuote(order, basket, customizations, logos, quotePreview)}
+                                                        disabled={sendingQuote === order.id}
+                                                        className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-lg text-xs font-black hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/15 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                    >
+                                                        {sendingQuote === order.id ? (
+                                                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        ) : (
+                                                            <Send className="w-3.5 h-3.5" />
+                                                        )}
+                                                        {sendingQuote === order.id ? 'Preparing...' : 'Send Quote'}
                                                     </button>
                                                     <button
                                                         data-html2canvas-ignore="true"
@@ -773,10 +1529,40 @@ const Orders = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-1 sm:p-2 bg-slate-50">
+                                            <div data-html2canvas-ignore="true" className="quote-admin-only mb-8 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
+                                                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                                    <div className="grid grid-cols-3 gap-3 w-full lg:max-w-[520px]">
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Original</div>
+                                                            <div className="text-lg font-black text-slate-500 line-through">{formatMoney(quotePreview.originalTotalIncVat)}</div>
+                                                        </div>
+                                                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                                                            <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">New Total</div>
+                                                            <div className="text-lg font-black text-slate-900">{formatMoney(quotePreview.totalIncVat)}</div>
+                                                        </div>
+                                                        <div className="bg-slate-900 text-white rounded-xl p-3">
+                                                            <div className="text-[10px] font-black text-white/60 uppercase tracking-widest">Discount</div>
+                                                            <div className="text-lg font-black">
+                                                                {quotePreview.discountAmount > 0 ? `${quotePreview.discountPercent.toFixed(0)}% off` : 'No change'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {quotePreview.hasChanges && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => resetQuoteAdjustments(order.id)}
+                                                            className="px-4 py-2 text-xs font-black text-slate-500 hover:text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all"
+                                                        >
+                                                            Reset price edits
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="quote-print-layout grid grid-cols-1 lg:grid-cols-3 gap-8 p-1 sm:p-2 bg-slate-50">
                                                 {/* Left Column: Customer & Details */}
-                                                <div className="space-y-6">
-                                                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                                <div className="quote-print-sidebar space-y-6">
+                                                    <div className="quote-print-card bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                                                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                             <User className="w-4 h-4 text-primary" /> Customer Details
                                                         </h4>
@@ -804,7 +1590,7 @@ const Orders = () => {
 
                                                     {/* Customization Summary */}
                                                     {customizations.length > 0 && (
-                                                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                                        <div className="quote-print-card bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                                                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                                 <Edit3 className="w-4 h-4 text-primary" /> Design Requests
                                                             </h4>
@@ -940,7 +1726,7 @@ const Orders = () => {
                                                         if (allLogos.length === 0) return null
 
                                                         return (
-                                                            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                                            <div className="quote-print-card bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                                                                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                                     <ImageIcon className="w-4 h-4 text-primary" /> Uploaded Logos ({allLogos.length})
                                                                 </h4>
@@ -948,7 +1734,7 @@ const Orders = () => {
                                                                     {allLogos.map((logo, idx) => (
                                                                         <div key={idx} className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
                                                                             <div className="p-2">
-                                                                                <div className="w-full h-40 bg-white rounded-xl border border-slate-100 flex items-center justify-center overflow-hidden relative">
+                                                                                <div className="quote-print-logo-preview w-full h-40 bg-white rounded-xl border border-slate-100 flex items-center justify-center overflow-hidden relative">
                                                                                     <div className="absolute inset-0 opacity-5 pointer-events-none"
                                                                                         style={{ backgroundImage: 'linear-gradient(45deg, #666 25%, transparent 25%), linear-gradient(-45deg, #666 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #666 75%), linear-gradient(-45deg, transparent 75%, #666 75%)', backgroundSize: '8px 8px', backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px' }}>
                                                                                     </div>
@@ -1015,60 +1801,67 @@ const Orders = () => {
                                                 </div>
 
                                                 {/* Right Column: Cost Breakdown & Order Items */}
-                                                <div className="lg:col-span-2 space-y-8">
+                                                <div className="quote-print-main lg:col-span-2 space-y-8">
                                                     
                                                     {/* Cost Breakdown Section (Inspired by App Design) */}
-                                                    <div className="bg-white rounded-[24px] border-2 border-primary/20 shadow-md p-6 lg:p-8">
+                                                    <div className="quote-print-cost bg-white rounded-[24px] border-2 border-primary/20 shadow-md p-6 lg:p-8">
                                                         <h4 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
                                                             Cost Breakdown
                                                         </h4>
                                                         
                                                         <div className="space-y-4">
-                                                            {/* Garment Cost */}
-                                                            {summary.garmentCost > 0 && (
-                                                                <div className="bg-[#f97316] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-                                                                    <div>
-                                                                        <div className="font-bold text-lg mb-1.5 flex items-center gap-2">
-                                                                            Garment Cost <span className="text-[10px] font-black opacity-90 uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded-full">ex vat</span>
-                                                                        </div>
-                                                                        <div className="text-sm font-semibold opacity-90 flex gap-6">
-                                                                            <span>Unit Price: £{summary.totalQuantity > 0 ? (summary.garmentCost / summary.totalQuantity).toFixed(2) : '0.00'}</span>
-                                                                            <span>Qty: {summary.totalQuantity || 0}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="text-2xl font-black tracking-tight">£{summary.garmentCost?.toFixed(2)}</div>
-                                                                </div>
-                                                            )}
+                                                            {quotePreview.lines.map((line, idx) => {
+                                                                const color = line.type === 'garment'
+                                                                    ? '#f97316'
+                                                                    : line.type === 'setup'
+                                                                        ? '#b15d24'
+                                                                        : ['#8b3f96', '#70864f'][idx % 2]
+                                                                const lineDiscount = Math.max(0, line.original - line.adjusted)
+                                                                const lineDiscountPercent = line.original > 0 ? (lineDiscount / line.original) * 100 : 0
+                                                                const rawValue = quoteAdjustments[String(order.id)]?.[line.key]
 
-                                                            {/* Customizations Iteration */}
-                                                            {customizations.map((cust, idx) => {
-                                                                const custColors = ['#8b3f96', '#70864f']
                                                                 return (
-                                                                <div key={`cost-cust-${idx}`} style={{ backgroundColor: custColors[idx % custColors.length] }} className="p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-                                                                    <div>
-                                                                        <div className="font-bold text-lg mb-1.5 flex items-center gap-2">
-                                                                            {cust.position ? `${cust.position} ${cust.method}` : cust.method}
+                                                                    <div key={line.key} style={{ backgroundColor: color }} className="p-5 rounded-2xl text-white flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-sm">
+                                                                        <div>
+                                                                            <div className="font-bold text-lg mb-1.5 flex items-center gap-2">
+                                                                                {line.label} <span className="text-[10px] font-black opacity-90 uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded-full">ex vat</span>
+                                                                            </div>
+                                                                            <div className="text-sm font-semibold opacity-90 flex flex-wrap gap-x-6 gap-y-1">
+                                                                                <span>{line.description}</span>
+                                                                                {lineDiscount > 0 && (
+                                                                                    <span className="bg-white/20 px-2 py-0.5 rounded-full">{lineDiscountPercent.toFixed(0)}% discount</span>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="text-sm font-semibold opacity-90 flex gap-6">
-                                                                            <span>Unit Price: £{cust.unitPrice?.toFixed(2)}</span>
-                                                                            <span>Qty: {cust.quantity}</span>
+                                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3">
+                                                                            <div className="text-right">
+                                                                                {lineDiscount > 0 && (
+                                                                                    <div className="text-sm font-black opacity-60 line-through">{formatMoney(line.original)}</div>
+                                                                                )}
+                                                                                <div className="text-2xl font-black tracking-tight">{formatMoney(line.adjusted)}</div>
+                                                                            </div>
+                                                                            <div data-html2canvas-ignore="true" className="quote-admin-only w-full sm:w-36">
+                                                                                <label className="block text-[9px] font-black uppercase tracking-widest text-white/70 mb-1">New price</label>
+                                                                                <div className="relative">
+                                                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-black">£</span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min="0"
+                                                                                        step="0.01"
+                                                                                        value={rawValue ?? line.original.toFixed(2)}
+                                                                                        onChange={(event) => updateQuoteAmount(order.id, line.key, event.target.value)}
+                                                                                        className="w-full rounded-xl border-0 bg-white py-2.5 pl-7 pr-3 text-sm font-black text-slate-900 shadow-sm outline-none focus:ring-4 focus:ring-white/25"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="text-2xl font-black tracking-tight">£{cust.lineTotal?.toFixed(2)}</div>
-                                                                </div>
                                                                 )
                                                             })}
-                                                            
-                                                            {/* Digitizing Fee (if any) */}
-                                                            {summary.digitizingFee > 0 && (
-                                                                <div className="bg-[#b15d24] p-5 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-                                                                    <div>
-                                                                        <div className="font-bold text-lg mb-1.5 flex items-center gap-2">
-                                                                            Digitisation / Setup Fee
-                                                                        </div>
-                                                                        <div className="text-sm font-semibold opacity-90">One-time template setup fee</div>
-                                                                    </div>
-                                                                    <div className="text-2xl font-black tracking-tight">£{summary.digitizingFee?.toFixed(2)}</div>
+
+                                                            {quotePreview.lines.length === 0 && (
+                                                                <div className="p-5 rounded-2xl border border-dashed border-slate-300 text-slate-500 text-sm font-bold">
+                                                                    No priced quote lines were found in this request.
                                                                 </div>
                                                             )}
 
@@ -1078,21 +1871,24 @@ const Orders = () => {
                                                                     Total Cost
                                                                 </div>
                                                                 <div className="flex flex-col items-end">
-                                                                    <div className="text-2xl lg:text-3xl font-black tracking-tight flex items-baseline gap-1">
-                                                                        £{(summary.totalExVat || summary.subtotal)?.toFixed(2)}
-                                                                        <span className="text-xs font-bold opacity-70 uppercase">ex vat</span>
-                                                                    </div>
-                                                                    {summary.totalIncVat > 0 && (
-                                                                        <div className="text-sm font-bold opacity-60 mt-0.5">
-                                                                            £{summary.totalIncVat?.toFixed(2)} inc VAT
+                                                                    {quotePreview.discountAmount > 0 && (
+                                                                        <div className="text-sm font-black opacity-60 line-through">
+                                                                            {formatMoney(quotePreview.originalTotalIncVat)} inc VAT
                                                                         </div>
                                                                     )}
+                                                                    <div className="text-2xl lg:text-3xl font-black tracking-tight flex items-baseline gap-1">
+                                                                        {formatMoney(quotePreview.adjustedSubtotal)}
+                                                                        <span className="text-xs font-bold opacity-70 uppercase">ex vat</span>
+                                                                    </div>
+                                                                    <div className="text-sm font-bold opacity-70 mt-0.5">
+                                                                        {formatMoney(quotePreview.totalIncVat)} inc VAT
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
 
-                                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                                    <div className="quote-print-items bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                                         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                                                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                                                 <Package className="w-4 h-4 text-primary" /> Order Items ({basket.length})
@@ -1122,14 +1918,24 @@ const Orders = () => {
                                                                                 <div className="text-xs font-bold text-slate-400 mt-0.5">{item.code} • {item.color}</div>
                                                                             </div>
                                                                             <div className="text-right shrink-0 ml-2">
-                                                                                <div className="font-bold text-slate-900">£{item.itemTotal?.toFixed(2)}</div>
-                                                                                <div className="text-xs text-slate-500">£{item.unitPrice?.toFixed(2)} ea</div>
+                                                                                <div className="font-bold text-slate-900">{formatMoney(item.itemTotal)}</div>
+                                                                                <div className="text-xs text-slate-500">{formatMoney(item.unitPrice)} ea</div>
                                                                             </div>
                                                                         </div>
 
-                                                                        {/* Size Breakdown */}
+                                                                        {/* Size & Quantity Display */}
                                                                         <div className="mt-3 flex flex-wrap gap-2">
-                                                                            {Object.entries(item.sizes || {}).map(([size, qty]) => (
+                                                                            {/* If data has single size/quantity fields */}
+                                                                            {item.size && (
+                                                                                <div className="px-2 py-1 rounded-md bg-primary/5 border border-primary/10 text-xs font-medium text-primary flex items-center gap-1.5">
+                                                                                    <span className="font-bold">Size: {item.size}</span>
+                                                                                    <span className="opacity-40">|</span>
+                                                                                    <span>Qty: {item.quantity || 0}</span>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* If data has the sizes breakdown object */}
+                                                                            {item.sizes && Object.entries(item.sizes).map(([size, qty]) => (
                                                                                 qty > 0 && (
                                                                                     <div key={size} className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200 text-xs font-medium text-slate-600 flex items-center gap-1.5">
                                                                                         <span className="font-bold text-slate-800">{size}</span>
@@ -1149,16 +1955,22 @@ const Orders = () => {
                                                             <div className="flex flex-col gap-2 max-w-xs ml-auto">
                                                                 <div className="flex justify-between text-sm">
                                                                     <span className="text-slate-500 font-medium">Subtotal</span>
-                                                                    <span className="font-bold text-slate-900">£{summary.subtotal?.toFixed(2)}</span>
+                                                                    <span className="font-bold text-slate-900">{formatMoney(quotePreview.adjustedSubtotal)}</span>
                                                                 </div>
                                                                 <div className="flex justify-between text-sm">
-                                                                    <span className="text-slate-500 font-medium">VAT ({(summary.vatRate * 100).toFixed(0)}%)</span>
-                                                                    <span className="font-bold text-slate-900">£{summary.vatAmount?.toFixed(2)}</span>
+                                                                    <span className="text-slate-500 font-medium">VAT ({(quotePreview.vatRate * 100).toFixed(0)}%)</span>
+                                                                    <span className="font-bold text-slate-900">{formatMoney(quotePreview.vatAmount)}</span>
                                                                 </div>
+                                                                {quotePreview.discountAmount > 0 && (
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span className="text-emerald-600 font-bold">Customer discount</span>
+                                                                        <span className="font-black text-emerald-600">{quotePreview.discountPercent.toFixed(0)}% off</span>
+                                                                    </div>
+                                                                )}
                                                                 <div className="h-px bg-slate-200 my-1"></div>
                                                                 <div className="flex justify-between text-base">
                                                                     <span className="font-black text-slate-800 uppercase tracking-wide">Total</span>
-                                                                    <span className="font-black text-primary text-lg">£{summary.totalIncVat?.toFixed(2)}</span>
+                                                                    <span className="font-black text-primary text-lg">{formatMoney(quotePreview.totalIncVat)}</span>
                                                                 </div>
                                                             </div>
                                                         </div>

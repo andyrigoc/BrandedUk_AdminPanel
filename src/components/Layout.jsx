@@ -132,7 +132,8 @@ const Layout = ({ children, onLogout }) => {
     {
       title: 'Navigation',
       items: [
-        { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+        { name: 'Orders', path: '/', icon: ShoppingCart },
+        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Calendar', path: '/calendar', icon: CalendarDays },
         { name: 'Clarity', path: '/clarity', icon: Activity },
       ]
@@ -151,6 +152,7 @@ const Layout = ({ children, onLogout }) => {
             { name: 'Product Type', path: '/product-types' },
             { name: 'Catalog Curator', path: '/featured' },
             { name: 'Home Highlights', path: '/featured-products' },
+            { name: 'Humanitiees Products', path: '/humanitiees-products' },
           ]
         }
       ]
@@ -165,8 +167,8 @@ const Layout = ({ children, onLogout }) => {
     {
       title: 'Operations',
       items: [
-        { name: 'Orders', path: '/orders', icon: ShoppingCart },
         { name: 'Customers', path: '/customers', icon: Users },
+        { name: 'Humanity Customers', path: '/humanitiees-customers', icon: Users },
         { name: 'Brands', path: '/brands', icon: Building2 },
         { name: 'Customization', path: '/customization', icon: Palette },
         { name: 'System', path: '/system', icon: Settings },
@@ -176,7 +178,7 @@ const Layout = ({ children, onLogout }) => {
 
   const isActive = (path) => {
     if (!path) return false
-    if (path === '/') return location.pathname === '/' || location.pathname.startsWith('/products/')
+    if (path === '/') return location.pathname === '/' || location.pathname === '/orders' || location.pathname.startsWith('/orders/')
     if (path.includes('ignore')) return false
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
@@ -184,7 +186,7 @@ const Layout = ({ children, onLogout }) => {
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans">
       {/* Sidebar - Premium Black with Purple Accents */}
-      <aside className="w-[232px] bg-[#71717a] flex flex-col z-20 border-r border-white/20 relative overflow-hidden">
+      <aside className="w-[232px] bg-black flex flex-col z-20 border-r border-white/20 relative overflow-hidden">
         {/* Subtle Branding Glow */}
         <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-[80px] -translate-y-16 -translate-x-16 pointer-events-none" />
 
@@ -306,7 +308,7 @@ const Layout = ({ children, onLogout }) => {
                 w-full group flex items-center justify-center gap-3 px-4 py-3 text-[13px] font-extrabold transition-all duration-300 rounded-lg border relative overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.25)]
                 ${syncing
                   ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
-                  : 'bg-black border-black/30 text-white hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] active:scale-[0.98]'
+                  : 'bg-black border-white/30 text-white hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] active:scale-[0.98]'
                 }
               `}
             >

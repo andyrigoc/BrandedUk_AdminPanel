@@ -9,8 +9,28 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'https://api.brandeduk.com',
         changeOrigin: true,
+        secure: true,
+        headers: {
+          Origin: 'https://admin.brandeduk.com',
+        },
+      },
+      '/assets': {
+        target: 'https://api.brandeduk.com',
+        changeOrigin: true,
+        secure: true,
+        headers: {
+          Origin: 'https://admin.brandeduk.com',
+        },
+      },
+      '/uploads': {
+        target: 'https://api.brandeduk.com',
+        changeOrigin: true,
+        secure: true,
+        headers: {
+          Origin: 'https://admin.brandeduk.com',
+        },
       }
     }
   }
