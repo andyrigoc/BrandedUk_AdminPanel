@@ -16,6 +16,7 @@ import Calendar from './pages/Calendar'
 import System from './pages/System'
 import MarkupOverrides from './pages/MarkupOverrides'
 import PriceOverrides from './pages/PriceOverrides'
+import Clarity from './pages/Clarity'
 
 import { useState, useEffect } from 'react'
 import Login from './pages/Login'
@@ -69,6 +70,7 @@ function App() {
           <Route path="/system" element={<System />} />
           <Route path="/markup-overrides" element={<MarkupOverrides />} />
           <Route path="/price-overrides" element={<PriceOverrides />} />
+          <Route path="/clarity" element={<Clarity />} />
         </Routes>
       </Layout>
     </Router>

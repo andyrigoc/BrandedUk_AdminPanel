@@ -28,7 +28,8 @@ import {
   LogOut,
   X,
   Users,
-  CalendarDays
+  CalendarDays,
+  Activity
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { API_BASE } from '../config'
@@ -133,6 +134,7 @@ const Layout = ({ children, onLogout }) => {
       items: [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard },
         { name: 'Calendar', path: '/calendar', icon: CalendarDays },
+        { name: 'Clarity', path: '/clarity', icon: Activity },
       ]
     },
     {
