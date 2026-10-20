@@ -33,6 +33,8 @@ import {
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { API_BASE } from '../config'
+import brandedLogo from '../assets/branded-given.png'
+import humaniteeWordmark from '../assets/humanitee-wordmark.png'
 
 const Layout = ({ children, onLogout }) => {
   const location = useLocation()
@@ -86,6 +88,8 @@ const Layout = ({ children, onLogout }) => {
 
   // State for collapsible sub-menus
   const [expandedMenus, setExpandedMenus] = useState(['Products'])
+  const [brandedOpen, setBrandedOpen] = useState(true)
+  const [humaniteeOpen, setHumaniteeOpen] = useState(false)
 
   const toggleMenu = (name) => {
     setExpandedMenus(prev =>
@@ -152,7 +156,6 @@ const Layout = ({ children, onLogout }) => {
             { name: 'Product Type', path: '/product-types' },
             { name: 'Catalog Curator', path: '/featured' },
             { name: 'Home Highlights', path: '/featured-products' },
-            { name: 'Humanitiees Products', path: '/humanitiees-products' },
           ]
         }
       ]
@@ -168,7 +171,6 @@ const Layout = ({ children, onLogout }) => {
       title: 'Operations',
       items: [
         { name: 'Customers', path: '/customers', icon: Users },
-        { name: 'Humanity Customers', path: '/humanitiees-customers', icon: Users },
         { name: 'Brands', path: '/brands', icon: Building2 },
         { name: 'Customization', path: '/customization', icon: Palette },
         { name: 'System', path: '/system', icon: Settings },
@@ -190,21 +192,19 @@ const Layout = ({ children, onLogout }) => {
         {/* Subtle Branding Glow */}
         <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-[80px] -translate-y-16 -translate-x-16 pointer-events-none" />
 
-        {/* Logo Section - Sharp & Dark */}
-        <div className="h-16 flex items-center px-6 border-b border-white/10 relative z-10">
-          <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="w-7 h-7 rounded bg-primary flex items-center justify-center shadow-[0_0_15px_rgba(124,58,237,0.4)]">
-              <span className="text-white font-black text-base">B</span>
-            </div>
-            <div>
-              <h1 className="text-[14px] font-extrabold text-white tracking-tight leading-none">BrandedUK</h1>
-              <p className="text-[10px] text-white/70 font-bold mt-1 uppercase tracking-wider">Admin</p>
-            </div>
-          </Link>
+        <div className="px-3 pt-4 pb-3 relative z-10 border-b border-white/10">
+          <button
+            type="button"
+            onClick={() => setBrandedOpen(open => !open)}
+            className="flex w-full items-center gap-1.5 rounded-xl bg-white px-2 py-0.5 shadow-md"
+          >
+            <img src={brandedLogo} alt="Branded UK" className="block h-11 w-full min-w-0 flex-1 object-cover object-center" />
+            <ChevronDown className={`h-4 w-4 shrink-0 text-slate-900 transition-transform ${brandedOpen ? 'rotate-180' : ''}`} />
+          </button>
         </div>
 
         {/* Navigation - Calm & Structured */}
-        <nav className="flex-1 overflow-y-auto px-2 py-10 space-y-10 thin-scrollbar relative z-10">
+        <nav className={`flex-1 overflow-y-auto px-2 py-4 space-y-8 thin-scrollbar relative z-10 ${brandedOpen ? '' : 'hidden'}`}>
           {sections.map((section) => (
             <div key={section.title} className="space-y-3">
               <div className="flex items-center gap-2 px-4 mb-3">
@@ -297,6 +297,33 @@ const Layout = ({ children, onLogout }) => {
             </div>
           ))}
         </nav>
+
+        <div className="px-3 py-3 relative z-10 border-t border-white/10">
+          <button
+            type="button"
+            onClick={() => setHumaniteeOpen(open => !open)}
+            className="flex w-full items-center justify-between gap-2 rounded-xl bg-white px-3 py-2.5 text-left shadow-md"
+          >
+            <img src={humaniteeWordmark} alt="Humanitee" className="h-4 w-auto object-contain" />
+            <ChevronDown className={`h-4 w-4 shrink-0 text-slate-900 transition-transform ${humaniteeOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {humaniteeOpen && (
+            <div className="mt-2 space-y-1">
+              <Link
+                to="/humanitiees-products"
+                className={`block rounded-lg px-3 py-2 text-[13px] font-semibold ${isActive('/humanitiees-products') ? 'bg-white text-slate-900' : 'text-white hover:bg-white/10'}`}
+              >
+                Products
+              </Link>
+              <Link
+                to="/humanitiees-customers"
+                className={`block rounded-lg px-3 py-2 text-[13px] font-semibold ${isActive('/humanitiees-customers') ? 'bg-white text-slate-900' : 'text-white hover:bg-white/10'}`}
+              >
+                Customers
+              </Link>
+            </div>
+          )}
+        </div>
 
         {/* System Controls - Premium High-Visibility Action */}
         <div className="px-3 pb-6 pt-6 border-t border-white/20 bg-white/[0.05]">

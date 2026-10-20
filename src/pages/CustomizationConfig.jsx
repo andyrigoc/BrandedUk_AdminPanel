@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Card from '../components/Card'
 import {
     AlertCircle,
     CheckCircle2,
+    GripVertical,
     Image as ImageIcon,
     Plus,
     Search,
@@ -14,6 +15,13 @@ import { API_BASE } from '../config'
 
 const TEMPLATE_API = `${API_BASE}/api/admin/customization/templates`
 const PRODUCT_TYPES_API = TEMPLATE_API
+const PRICE_SCHEMA_API = `${API_BASE}/api/customization-price-schema`
+
+const templateRequestUrl = (slug, subtypeKey = '') => {
+    const path = `${TEMPLATE_API}/${encodeURIComponent(slug)}`
+    if (!subtypeKey) return path
+    return `${path}?${new URLSearchParams({ subtype: subtypeKey }).toString()}`
+}
 const IMAGE_UPLOAD_API = `${API_BASE}/api/admin/customization-config/upload-image`
 
 const GENERIC_SUBTYPE = { key: '', label: 'Generic fallback' }
@@ -72,6 +80,54 @@ const CUSTOMIZATION_SUBTYPES = {
 }
 
 const methodPriceValue = (value) => value === null || value === undefined ? '' : String(value)
+
+const FALLBACK_DECORATION_SCHEMA = {
+    print: [
+        { min: 1, max: 8, price: 7.5 },
+        { min: 9, max: 24, price: 5.25 },
+        { min: 25, max: 99, price: 4 },
+        { min: 100, max: 249, price: 3 },
+        { min: 250, max: 499, price: 2.5 },
+        { min: 500, max: 749, price: 2.25 },
+        { min: 750, max: 999, price: 2 },
+        { min: 1000, max: null, price: 1.75 }
+    ],
+    embroidery: [
+        { min: 1, max: 8, price: 8 },
+        { min: 9, max: 24, price: 6 },
+        { min: 25, max: 99, price: 4.75 },
+        { min: 100, max: 249, price: 3.75 },
+        { min: 250, max: 499, price: 2.5 },
+        { min: 500, max: 749, price: 2.25 },
+        { min: 750, max: 999, price: 2 },
+        { min: 1000, max: null, price: 1.75 }
+    ],
+    digitisingFee: 25,
+    largePrintFlat: 7.7,
+    version: '',
+    source: 'storefront'
+}
+
+const normalizeLoadedSchema = (payload) => {
+    const root = payload?.data || payload || {}
+    const print = root.print || root.methods?.print || []
+    const embroidery = root.embroidery || root.methods?.embroidery || []
+    const fee = root.digitisingFee
+    return {
+        print: print.map(tier => ({ min: tier.min, max: tier.max ?? null, price: tier.price })),
+        embroidery: embroidery.map(tier => ({ min: tier.min, max: tier.max ?? null, price: tier.price })),
+        digitisingFee: typeof fee === 'object' && fee !== null ? fee.embroidery : fee,
+        largePrintFlat: root.largePrintFlat ?? FALLBACK_DECORATION_SCHEMA.largePrintFlat,
+        version: root.version || root.pricingVersion || '',
+        source: 'api'
+    }
+}
+
+const loadDecorationPriceSchema = async () => {
+    const response = await fetch(PRICE_SCHEMA_API)
+    if (!response.ok) throw new Error(`Failed to load the price schema (${response.status})`)
+    return normalizeLoadedSchema(await response.json())
+}
 
 const slugify = (value) => String(value || '')
     .trim()
@@ -139,7 +195,7 @@ const normalizeTemplateResponse = (data, fallbackType) => {
                 embroidery_price: position.embroidery_price ?? getMethodConfig(position.methods, 'embroidery')?.price ?? null,
                 print_enabled: position.print_enabled ?? getMethodConfig(position.methods, 'print')?.enabled ?? getMethodConfig(position.methods, 'print')?.isEnabled ?? !!getMethodConfig(position.methods, 'print'),
                 print_price: position.print_price ?? getMethodConfig(position.methods, 'print')?.price ?? null
-            }))
+            })).sort((first, second) => Number(first.sort_order) - Number(second.sort_order))
             : []
     }
 }
@@ -225,9 +281,40 @@ const CustomizationConfig = () => {
     const [statusMessage, setStatusMessage] = useState(null)
     const [typeSearch, setTypeSearch] = useState('')
     const [baselineSnapshot, setBaselineSnapshot] = useState('')
+    const [priceSchema, setPriceSchema] = useState(null)
+    const [priceSchemaLoading, setPriceSchemaLoading] = useState(true)
+    const [priceSchemaSaving, setPriceSchemaSaving] = useState(false)
+    const [priceSchemaNote, setPriceSchemaNote] = useState('')
+    const [draggingPositionId, setDraggingPositionId] = useState(null)
+    const [dropTargetId, setDropTargetId] = useState(null)
+    const draggedPositionId = useRef(null)
 
     useEffect(() => {
         fetchProductTypes()
+    }, [])
+
+    useEffect(() => {
+        let active = true
+        const loadSchema = async () => {
+            try {
+                setPriceSchemaLoading(true)
+                const schema = await loadDecorationPriceSchema()
+                if (!active) return
+                setPriceSchema(schema)
+                setPriceSchemaNote('')
+            } catch (error) {
+                console.error(error)
+                if (!active) return
+                setPriceSchema(FALLBACK_DECORATION_SCHEMA)
+                setPriceSchemaNote('Live pricing is unavailable, so these are the standard storefront tiers.')
+            } finally {
+                if (active) setPriceSchemaLoading(false)
+            }
+        }
+        loadSchema()
+        return () => {
+            active = false
+        }
     }, [])
 
     useEffect(() => {
@@ -253,14 +340,26 @@ const CustomizationConfig = () => {
         return snapshotTemplate(template) !== baselineSnapshot
     }, [template, baselineSnapshot])
 
+    const productTypesWithTote = useMemo(() => {
+        const hasTote = productTypes.some(type => {
+            const name = String(type.name || '').toLowerCase()
+            const slug = String(type.slug || '').toLowerCase()
+            return name === 'tote' || slug === 'tote' || slug === 'tote-bags'
+        })
+        if (hasTote) return productTypes
+        const next = [...productTypes, { id: 'tote-shortcut', name: 'Tote', slug: 'bags', pinnedSubtype: 'tote' }]
+        next.sort((a, b) => a.name.localeCompare(b.name))
+        return next
+    }, [productTypes])
+
     const filteredProductTypes = useMemo(() => {
         const query = typeSearch.trim().toLowerCase()
-        if (!query) return productTypes
-        return productTypes.filter(type =>
+        if (!query) return productTypesWithTote
+        return productTypesWithTote.filter(type =>
             String(type.name || '').toLowerCase().includes(query) ||
             String(type.slug || '').toLowerCase().includes(query)
         )
-    }, [productTypes, typeSearch])
+    }, [productTypesWithTote, typeSearch])
 
     useEffect(() => {
         const handleKeyDown = (event) => {
@@ -319,9 +418,7 @@ const CustomizationConfig = () => {
         try {
             setLoadingTemplate(true)
             setStatusMessage(null)
-            const templateUrl = new URL(`${TEMPLATE_API}/${encodeURIComponent(slug)}`)
-            if (subtypeKey) templateUrl.searchParams.set('subtype', subtypeKey)
-            const response = await fetch(templateUrl.toString())
+            const response = await fetch(templateRequestUrl(slug, subtypeKey))
             if (response.status === 404) {
                 const blankTemplate = createBlankTemplate(fallbackType)
                 setTemplate(blankTemplate)
@@ -407,6 +504,26 @@ const CustomizationConfig = () => {
         }))
     }
 
+    const moveDraggedPosition = (targetId) => {
+        const sourceId = draggedPositionId.current
+        if (!sourceId || sourceId === targetId) return
+        updateTemplate(prev => {
+            const positions = [...(prev?.positions || [])]
+            const fromIndex = positions.findIndex(position => position.id === sourceId)
+            const toIndex = positions.findIndex(position => position.id === targetId)
+            if (fromIndex < 0 || toIndex < 0) return prev
+            const [moved] = positions.splice(fromIndex, 1)
+            positions.splice(toIndex, 0, moved)
+            return { ...prev, positions }
+        })
+    }
+
+    const clearPositionDrag = () => {
+        draggedPositionId.current = null
+        setDraggingPositionId(null)
+        setDropTargetId(null)
+    }
+
     const handleRemoveImage = (positionId) => {
         handlePositionChange(positionId, 'preview_image_url', null)
         handlePositionChange(positionId, 'saved_image_url', null)
@@ -418,9 +535,7 @@ const CustomizationConfig = () => {
             setSaving(true)
             setStatusMessage(null)
             const subtypeKey = activeSubtypeKey
-            const templateUrl = new URL(`${TEMPLATE_API}/${encodeURIComponent(selectedTypeSlug)}`)
-            if (subtypeKey) templateUrl.searchParams.set('subtype', subtypeKey)
-            const response = await fetch(templateUrl.toString(), {
+            const response = await fetch(templateRequestUrl(selectedTypeSlug, subtypeKey), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -458,9 +573,7 @@ const CustomizationConfig = () => {
         try {
             setSaving(true)
             setStatusMessage(null)
-            const templateUrl = new URL(`${TEMPLATE_API}/${encodeURIComponent(selectedTypeSlug)}`)
-            if (subtypeKey) templateUrl.searchParams.set('subtype', subtypeKey)
-            const response = await fetch(templateUrl.toString(), {
+            const response = await fetch(templateRequestUrl(selectedTypeSlug, subtypeKey), {
                 method: 'DELETE'
             })
             if (!response.ok) throw new Error(`Failed to delete config (${response.status})`)
@@ -539,6 +652,84 @@ const CustomizationConfig = () => {
         }
     }
 
+    const schemaRowCount = Math.max(priceSchema?.print?.length || 0, priceSchema?.embroidery?.length || 0)
+
+    const updateSchemaBand = (index, field, rawValue) => {
+        setPriceSchema(prev => {
+            if (!prev) return prev
+            const print = [...prev.print]
+            const embroidery = [...prev.embroidery]
+            while (print.length <= index) print.push({ min: '', max: '', price: '' })
+            while (embroidery.length <= index) embroidery.push({ min: '', max: '', price: '' })
+            const numeric = rawValue === '' ? '' : Number(rawValue)
+            if (field === 'min' || field === 'max') {
+                print[index] = { ...print[index], [field]: numeric }
+                embroidery[index] = { ...embroidery[index], [field]: numeric }
+            } else if (field === 'print') {
+                print[index] = { ...print[index], price: numeric }
+            } else {
+                embroidery[index] = { ...embroidery[index], price: numeric }
+            }
+            return { ...prev, print, embroidery }
+        })
+    }
+
+    const addSchemaBand = () => {
+        setPriceSchema(prev => {
+            if (!prev) return prev
+            const last = prev.print[prev.print.length - 1]
+            const min = last?.max ? Number(last.max) + 1 : ''
+            return {
+                ...prev,
+                print: [...prev.print, { min, max: '', price: '' }],
+                embroidery: [...prev.embroidery, { min, max: '', price: '' }]
+            }
+        })
+    }
+
+    const removeSchemaBand = (index) => {
+        setPriceSchema(prev => {
+            if (!prev || prev.print.length <= 1) return prev
+            return {
+                ...prev,
+                print: prev.print.filter((_, rowIndex) => rowIndex !== index),
+                embroidery: prev.embroidery.filter((_, rowIndex) => rowIndex !== index)
+            }
+        })
+    }
+
+    const handleSavePriceSchema = async () => {
+        if (!priceSchema) return
+        const toBand = (tier) => ({
+            min: Number(tier.min),
+            max: tier.max === '' || tier.max === null || tier.max === undefined ? null : Number(tier.max),
+            price: Number(tier.price)
+        })
+        try {
+            setPriceSchemaSaving(true)
+            setPriceSchemaNote('')
+            const response = await fetch(PRICE_SCHEMA_API, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    digitisingFee: Number(priceSchema.digitisingFee),
+                    largePrintFlat: Number(priceSchema.largePrintFlat),
+                    print: priceSchema.print.map(toBand),
+                    embroidery: priceSchema.embroidery.map(toBand)
+                })
+            })
+            const body = await response.json().catch(() => ({}))
+            if (!response.ok) throw new Error(body.message || `Failed to save the price schema (${response.status})`)
+            setPriceSchema(normalizeLoadedSchema(body))
+            setStatusMessage({ type: 'success', text: 'Price schema saved in the backend' })
+        } catch (error) {
+            console.error(error)
+            setStatusMessage({ type: 'error', text: error.message })
+        } finally {
+            setPriceSchemaSaving(false)
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
@@ -554,8 +745,147 @@ const CustomizationConfig = () => {
         <div className="max-w-[1600px] mx-auto">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-900">Customization Configuration</h1>
-                <p className="text-gray-500 mt-2">Manage customization positions, reference images, and decoration pricing by product type.</p>
+                <p className="text-gray-500 mt-2">Decoration prices follow the quantity schema used on the storefront. Positions and reference images stay below, by product type.</p>
             </div>
+
+            <Card className="p-6 mb-8">
+                <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
+                    <div>
+                        <h2 className="text-xl font-semibold text-gray-900">Decoration price schema</h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Unit price per logo, excluding VAT. The same bands apply to every product type.
+                        </p>
+                    </div>
+                    {priceSchema?.version && (
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 bg-slate-100 rounded-full px-3 py-1">
+                            Pricing {priceSchema.version}
+                        </div>
+                    )}
+                </div>
+
+                {priceSchemaLoading ? (
+                    <div className="py-8 text-center text-sm text-gray-500">Loading the backend price schema...</div>
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[720px] text-sm">
+                                <thead>
+                                    <tr className="text-left text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                                        <th className="py-3 pr-4">From qty</th>
+                                        <th className="py-3 pr-4">To qty</th>
+                                        <th className="py-3 pr-4">Print</th>
+                                        <th className="py-3 pr-4">Embroidery</th>
+                                        <th className="py-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Array.from({ length: schemaRowCount }, (_, index) => {
+                                        const printTier = priceSchema?.print?.[index] || {}
+                                        const embroideryTier = priceSchema?.embroidery?.[index] || {}
+                                        return (
+                                            <tr key={`band-${index}`} className="border-b border-slate-100 last:border-0">
+                                                <td className="py-3 pr-4">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={printTier.min ?? ''}
+                                                        onChange={(event) => updateSchemaBand(index, 'min', event.target.value)}
+                                                        className="w-24 px-3 py-2 border border-slate-200 rounded-lg"
+                                                    />
+                                                </td>
+                                                <td className="py-3 pr-4">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        placeholder="No max"
+                                                        value={printTier.max ?? ''}
+                                                        onChange={(event) => updateSchemaBand(index, 'max', event.target.value)}
+                                                        className="w-28 px-3 py-2 border border-slate-200 rounded-lg"
+                                                    />
+                                                </td>
+                                                <td className="py-3 pr-4">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={printTier.price ?? ''}
+                                                        onChange={(event) => updateSchemaBand(index, 'print', event.target.value)}
+                                                        className="w-28 px-3 py-2 border border-slate-200 rounded-lg"
+                                                    />
+                                                </td>
+                                                <td className="py-3 pr-4">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={embroideryTier.price ?? ''}
+                                                        onChange={(event) => updateSchemaBand(index, 'embroidery', event.target.value)}
+                                                        className="w-28 px-3 py-2 border border-slate-200 rounded-lg"
+                                                    />
+                                                </td>
+                                                <td className="py-3 text-right">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeSchemaBand(index)}
+                                                        className="text-sm text-rose-600 hover:text-rose-700"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">
+                            <label className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3">
+                                <span className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Embroidery digitising fee</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={priceSchema?.digitisingFee ?? ''}
+                                    onChange={(event) => setPriceSchema(prev => ({ ...prev, digitisingFee: event.target.value === '' ? '' : Number(event.target.value) }))}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white"
+                                />
+                            </label>
+                            <label className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3">
+                                <span className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Large front / large back print</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={priceSchema?.largePrintFlat ?? ''}
+                                    onChange={(event) => setPriceSchema(prev => ({ ...prev, largePrintFlat: event.target.value === '' ? '' : Number(event.target.value) }))}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white"
+                                />
+                            </label>
+                        </div>
+                        <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={addSchemaBand}
+                                className="px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
+                            >
+                                Add band
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSavePriceSchema}
+                                disabled={priceSchemaSaving}
+                                className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-accent disabled:opacity-50"
+                            >
+                                {priceSchemaSaving ? 'Saving schema...' : 'Save price schema'}
+                            </button>
+                            <p className="text-sm text-slate-500">Leave the last “to qty” empty. Prices exclude VAT.</p>
+                        </div>
+                        {priceSchemaNote && (
+                            <p className="mt-3 text-sm text-amber-700">{priceSchemaNote}</p>
+                        )}
+                    </>
+                )}
+            </Card>
 
             <div className="flex gap-8">
                 <aside className="w-64 flex-shrink-0">
@@ -574,16 +904,19 @@ const CustomizationConfig = () => {
                     </div>
                     <div className="space-y-0.5 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                         {filteredProductTypes.map(type => {
-                            const isSelected = selectedTypeSlug === type.slug
+                            const isSelected = type.pinnedSubtype
+                                ? selectedTypeSlug === type.slug && selectedSubtypeKey === type.pinnedSubtype
+                                : selectedTypeSlug === type.slug && !(type.slug === 'bags' && selectedSubtypeKey === 'tote')
 
                             return (
                                 <button
                                     key={type.id}
                                     onClick={async () => {
-                                        if (type.slug === selectedTypeSlug) return
+                                        const nextSubtype = type.pinnedSubtype || ''
+                                        if (type.slug === selectedTypeSlug && nextSubtype === selectedSubtypeKey) return
                                         const proceed = await requestDiscardOrSave()
                                         if (proceed) {
-                                            setSelectedSubtypeKey('')
+                                            setSelectedSubtypeKey(nextSubtype)
                                             setSelectedTypeSlug(type.slug)
                                         }
                                     }}
@@ -612,7 +945,7 @@ const CustomizationConfig = () => {
                             <Card className="p-6 mb-6">
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
-                                        <h2 className="text-xl font-semibold text-gray-900">{selectedType?.name || template.name}</h2>
+                                        <h2 className="text-xl font-semibold text-gray-900">{selectedTypeSlug === 'bags' && selectedSubtypeKey === 'tote' ? 'Tote' : (selectedType?.name || template.name)}</h2>
                                         {selectedSubtypeOptions.length > 0 && (
                                             <label className="block mt-4 mb-3">
                                                 <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
@@ -655,7 +988,7 @@ const CustomizationConfig = () => {
                             <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900">Positions</h3>
-                                    <p className="text-sm text-gray-500">Reorder, duplicate, upload, and price everything inline.</p>
+                                    <p className="text-sm text-gray-500">Drag a position by the handle. The one at the top is shown first. Press Save Config when you are done.</p>
                                 </div>
                                 <button
                                     onClick={handleAddPosition}
@@ -666,46 +999,44 @@ const CustomizationConfig = () => {
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-3">
                                 {(template.positions || []).map((position) => (
-                                    <Card key={position.id} className="p-6">
-                                        <div className="flex items-start justify-between gap-4 mb-5">
-                                            <div className="flex-1">
-                                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Position Name</label>
-                                                <input
-                                                    value={position.label}
-                                                    onChange={(e) => handlePositionChange(position.id, 'label', e.target.value)}
-                                                    className="w-full text-lg font-semibold text-gray-900 bg-transparent border-b-2 border-gray-200 focus:border-primary focus:outline-none pb-1"
-                                                />
-                                                <div className="mt-2 text-xs text-gray-400">
-                                                    Code: {position.code || slugify(position.label)}
-                                                </div>
+                                    <div
+                                        key={position.id}
+                                        onDragOver={(event) => {
+                                            event.preventDefault()
+                                            if (dropTargetId !== position.id) setDropTargetId(position.id)
+                                        }}
+                                        onDrop={(event) => {
+                                            event.preventDefault()
+                                            moveDraggedPosition(position.id)
+                                            clearPositionDrag()
+                                        }}
+                                        className={dropTargetId === position.id && draggingPositionId && draggingPositionId !== position.id ? 'rounded-xl ring-2 ring-primary' : ''}
+                                    >
+                                    <div className={`flex h-36 items-center gap-4 rounded-lg border border-slate-200 bg-white px-3 ${draggingPositionId === position.id ? 'opacity-60' : ''}`}>
+                                            <div
+                                                draggable
+                                                onDragStart={(event) => {
+                                                    draggedPositionId.current = position.id
+                                                    event.dataTransfer.effectAllowed = 'move'
+                                                    event.dataTransfer.setData('text/plain', String(position.id))
+                                                    setDraggingPositionId(position.id)
+                                                }}
+                                                onDragEnd={clearPositionDrag}
+                                                className="flex h-10 w-8 shrink-0 cursor-grab items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:cursor-grabbing"
+                                                title="Drag to move"
+                                            >
+                                                <GripVertical className="w-5 h-5" />
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeletePosition(position.id)}
-                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                    title="Delete position"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="mb-5">
-                                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Reference Image</label>
-                                            <label className="block cursor-pointer">
-                                                <div className="aspect-video bg-gray-100 rounded-lg border border-dashed border-gray-300 overflow-hidden flex items-center justify-center transition-colors hover:border-primary hover:bg-slate-50">
-                                                    {position.preview_image_url ? (
-                                                        <img src={position.preview_image_url} alt={position.label} className="w-full h-full object-contain bg-white" />
-                                                    ) : (
-                                                        <div className="text-center text-gray-400">
-                                                            <ImageIcon className="w-8 h-8 mx-auto mb-2" />
-                                                            <div className="text-sm font-medium">Click anywhere to upload</div>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            <label className="relative h-32 w-32 shrink-0 cursor-pointer overflow-hidden rounded border border-dashed border-slate-300 bg-slate-50" title="Change image">
+                                                {position.preview_image_url ? (
+                                                    <img src={position.preview_image_url} alt="" draggable={false} className="h-full w-full object-contain bg-white" />
+                                                ) : (
+                                                    <span className="flex h-full w-full items-center justify-center text-slate-400">
+                                                        <ImageIcon className="h-8 w-8" />
+                                                    </span>
+                                                )}
                                                 <input
                                                     type="file"
                                                     accept="image/*"
@@ -717,82 +1048,71 @@ const CustomizationConfig = () => {
                                                     }}
                                                 />
                                             </label>
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                <label className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 cursor-pointer transition-colors">
-                                                    <Upload className="w-4 h-4 mr-2" />
-                                                    {position.preview_image_url ? 'Change image' : 'Upload an image'}
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            const file = e.target.files?.[0]
-                                                            handleUploadImage(position, file)
-                                                            e.target.value = ''
-                                                        }}
-                                                    />
-                                                </label>
-                                                {position.preview_image_url && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveImage(position.id)}
-                                                        className="inline-flex items-center px-3 py-2 bg-red-50 text-red-700 rounded hover:bg-red-100"
-                                                    >
-                                                        <X className="w-4 h-4 mr-2" />
-                                                        Remove Image
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <div className="font-medium text-slate-900">Embroidery</div>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={Boolean(position.embroidery_enabled)}
-                                                        onChange={(e) => handlePositionChange(position.id, 'embroidery_enabled', e.target.checked)}
-                                                    />
-                                                </div>
-                                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">Price</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">£</span>
+                                            <input
+                                                value={position.label}
+                                                onChange={(e) => handlePositionChange(position.id, 'label', e.target.value)}
+                                                className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-gray-900 border-b border-transparent focus:border-primary focus:outline-none"
+                                            />
+                                            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4"
+                                                    checked={Boolean(position.embroidery_enabled)}
+                                                    onChange={(e) => handlePositionChange(position.id, 'embroidery_enabled', e.target.checked)}
+                                                />
+                                                Emb
+                                                <span className="relative">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">£</span>
                                                     <input
                                                         type="number"
                                                         step="0.01"
                                                         value={methodPriceValue(position.embroidery_price)}
                                                         onChange={(e) => handlePositionChange(position.id, 'embroidery_price', e.target.value === '' ? null : e.target.value)}
                                                         disabled={!position.embroidery_enabled}
-                                                        className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-lg focus:border-primary focus:outline-none bg-white"
+                                                        className="h-8 w-20 rounded border border-slate-200 bg-white py-0 pl-5 pr-1 text-sm disabled:bg-slate-50"
                                                     />
-                                                </div>
-                                            </div>
-
-                                            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <div className="font-medium text-slate-900">Print</div>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={Boolean(position.print_enabled)}
-                                                        onChange={(e) => handlePositionChange(position.id, 'print_enabled', e.target.checked)}
-                                                    />
-                                                </div>
-                                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">Price</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">£</span>
+                                                </span>
+                                            </label>
+                                            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4"
+                                                    checked={Boolean(position.print_enabled)}
+                                                    onChange={(e) => handlePositionChange(position.id, 'print_enabled', e.target.checked)}
+                                                />
+                                                Print
+                                                <span className="relative">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">£</span>
                                                     <input
                                                         type="number"
                                                         step="0.01"
                                                         value={methodPriceValue(position.print_price)}
                                                         onChange={(e) => handlePositionChange(position.id, 'print_price', e.target.value === '' ? null : e.target.value)}
                                                         disabled={!position.print_enabled}
-                                                        className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-lg focus:border-primary focus:outline-none bg-white"
+                                                        className="h-8 w-20 rounded border border-slate-200 bg-white py-0 pl-5 pr-1 text-sm disabled:bg-slate-50"
                                                     />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Card>
+                                                </span>
+                                            </label>
+                                            {position.preview_image_url && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveImage(position.id)}
+                                                    className="p-1 text-slate-400 hover:text-red-600"
+                                                    title="Remove image"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDeletePosition(position.id)}
+                                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                                title="Delete position"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                    </div>
+                                    </div>
                                 ))}
                             </div>
 
